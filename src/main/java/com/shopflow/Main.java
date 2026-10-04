@@ -6,263 +6,345 @@ import java.util.Scanner;
 public class Main {
 
     public static void main(String[] args) {
+
         Scanner scanner = new Scanner(System.in);
         ArrayList<Product> products = new ArrayList<>();
 
-        runMenu(products, scanner);
+        runMenu(scanner, products);
 
         scanner.close();
     }
 
-    private static void runMenu(
-            ArrayList<Product> products,
-            Scanner scanner) {
+    public static void runMenu(
+            Scanner scanner,
+            ArrayList<Product> products) {
 
         boolean running = true;
 
         while (running) {
-            String choice = showMenu(scanner);
+
+            showMenu();
+
+            String choice = scanner.nextLine().trim();
 
             switch (choice) {
+
                 case "1":
                     viewAllProducts(products);
                     break;
 
                 case "2":
-                    addProduct(products, scanner);
+                    addProduct(scanner, products);
                     break;
 
                 case "3":
-                    searchProduct(products, scanner);
+                    searchProduct(scanner, products);
                     break;
 
                 case "4":
-                    running = false;
                     exitMessage();
+                    running = false;
                     break;
 
                 default:
                     System.out.println(
-                            "Invalid option. Please choose 1, 2, 3, or 4."
+                            "Invalid option. Please choose 1-4."
                     );
             }
         }
     }
 
-    private static void viewAllProducts(ArrayList<Product> products) {
+    public static void showMenu() {
+
+        System.out.println();
+        System.out.println("===== ShopFlow Menu =====");
+        System.out.println("1. View all products");
+        System.out.println("2. Add product");
+        System.out.println("3. Search by code");
+        System.out.println("4. Exit");
+        System.out.print("Enter your choice: ");
+    }
+
+    public static void viewAllProducts(
+            ArrayList<Product> products) {
+
         if (products.isEmpty()) {
             System.out.println("No products found.");
             return;
         }
 
-        System.out.println("\n===== All Products =====");
         printTableHeader();
 
         for (Product product : products) {
-            printProduct(product);
+            product.displayProduct();
+        }
+
+        System.out.println();
+        System.out.println(
+                "Total products: " + products.size()
+        );
+
+        double totalStockValue = 0;
+
+        for (Product product : products) {
+            totalStockValue += product.getStockValue();
+        }
+
+        System.out.printf(
+                "Total stock value: %.2f%n",
+                totalStockValue
+        );
+    }
+
+    public static void addProduct(
+            Scanner scanner,
+            ArrayList<Product> products) {
+
+        Product product = createProduct(scanner, products);
+
+        if (product != null) {
+
+            products.add(product);
+
+            System.out.println(
+                    "Product added successfully."
+            );
         }
     }
 
-    private static void addProduct(
-            ArrayList<Product> products,
-            Scanner scanner) {
+    public static Product createProduct(
+            Scanner scanner,
+            ArrayList<Product> products) {
 
-        System.out.println("\n===== Add New Product =====");
-
-        String code = readProductCode(products, scanner);
-        String name = readNonEmptyName(scanner);
-        double price = readValidPrice(scanner);
-        int quantity = readValidQuantity(scanner);
-
-        Product product = createProduct(code, name, price, quantity);
-
-        products.add(product);
-
-        System.out.println("Product added successfully!");
-    }
-
-    private static String readProductCode(
-            ArrayList<Product> products,
-            Scanner scanner) {
+        String code;
 
         while (true) {
+
             System.out.print("Enter product code: ");
-            String code = scanner.nextLine().trim();
+            code = scanner.nextLine().trim();
 
             if (code.isEmpty()) {
                 System.out.println(
-                        "Product code cannot be empty. Please enter a code."
+                        "Code cannot be empty."
                 );
                 continue;
             }
 
-            if (isDuplicateCode(products, code)) {
+            if (!code.matches("\\d+")) {
                 System.out.println(
-                        "Product code already exists. Please enter a different code."
+                        "Code must contain numbers only."
                 );
                 continue;
             }
 
-            return code;
-        }
-    }
+            boolean duplicate = false;
 
-    private static boolean isDuplicateCode(
-            ArrayList<Product> products,
-            String code) {
+            for (Product product : products) {
 
-        for (Product product : products) {
-            if (product.getCode().equalsIgnoreCase(code)) {
-                return true;
+                if (product.getCode()
+                        .equalsIgnoreCase(code)) {
+
+                    duplicate = true;
+                    break;
+                }
+            }
+
+            if (duplicate) {
+
+                System.out.println(
+                        "Product code already exists."
+                );
+
+            } else {
+
+                break;
             }
         }
 
-        return false;
-    }
-
-    private static String readNonEmptyName(Scanner scanner) {
+        String name;
 
         while (true) {
+
             System.out.print("Enter product name: ");
-            String name = scanner.nextLine().trim();
+            name = scanner.nextLine().trim();
 
             if (name.isEmpty()) {
+
                 System.out.println(
-                        "Product name cannot be empty. Please enter a name."
+                        "Name cannot be empty."
                 );
                 continue;
             }
 
-            return name;
-        }
-    }
+            if (!name.matches("[a-zA-Z ]+")) {
 
-    private static double readValidPrice(Scanner scanner) {
+                System.out.println(
+                        "Name must contain letters and spaces only."
+                );
+                continue;
+            }
+
+            break;
+        }
+
+        String category;
 
         while (true) {
-            System.out.print("Enter product price: ");
-            String input = scanner.nextLine().trim();
 
-            if (input.isEmpty()) {
+            System.out.print("Enter product category: ");
+            category = scanner.nextLine().trim();
+
+            if (category.isEmpty()) {
+
                 System.out.println(
-                        "Price cannot be empty. Please enter a valid number."
+                        "Category cannot be empty."
                 );
                 continue;
             }
 
+            if (!category.matches("[a-zA-Z ]+")) {
+
+                System.out.println(
+                        "Category must contain letters and spaces only."
+                );
+                continue;
+            }
+
+            break;
+        }
+
+        double price;
+
+        while (true) {
+
+            System.out.print("Enter product price: ");
+
+            String priceInput =
+                    scanner.nextLine().trim();
+
             try {
-                double price = Double.parseDouble(input);
+
+                price = Double.parseDouble(priceInput);
 
                 if (price <= 0) {
+
                     System.out.println(
-                            "Price must be greater than 0. Please enter a positive number."
+                            "Price must be greater than 0."
                     );
                     continue;
                 }
 
-                return price;
+                break;
 
             } catch (NumberFormatException e) {
+
                 System.out.println(
-                        "Invalid price. Please enter a valid number without commas."
+                        "Invalid price. Please enter a number."
                 );
             }
         }
-    }
 
-    private static int readValidQuantity(Scanner scanner) {
+        int quantity;
 
         while (true) {
-            System.out.print("Enter product quantity: ");
-            String input = scanner.nextLine().trim();
 
-            if (input.isEmpty()) {
-                System.out.println(
-                        "Quantity cannot be empty. Please enter a valid whole number."
-                );
-                continue;
-            }
+            System.out.print("Enter stock quantity: ");
+
+            String quantityInput =
+                    scanner.nextLine().trim();
 
             try {
-                int quantity = Integer.parseInt(input);
+
+                quantity =
+                        Integer.parseInt(quantityInput);
 
                 if (quantity < 0) {
+
                     System.out.println(
-                            "Quantity cannot be negative. Please enter 0 or a positive whole number."
+                            "Stock quantity cannot be negative."
                     );
                     continue;
                 }
 
-                return quantity;
+                break;
 
             } catch (NumberFormatException e) {
+
                 System.out.println(
-                        "Invalid quantity. Please enter a valid whole number."
+                        "Invalid quantity. Please enter a whole number."
                 );
             }
         }
+
+        return new Product(
+                code,
+                name,
+                category,
+                price,
+                quantity
+        );
     }
 
-    private static Product createProduct(
-            String code,
-            String name,
-            double price,
-            int quantity) {
+    public static void searchProduct(
+            Scanner scanner,
+            ArrayList<Product> products) {
 
-        return new Product(code, name, price, quantity);
-    }
+        System.out.print(
+                "Enter product code to search: "
+        );
 
-    private static void searchProduct(
-            ArrayList<Product> products,
-            Scanner scanner) {
-
-        System.out.print("\nEnter product code to search: ");
-        String code = scanner.nextLine().trim();
-
-        if (code.isEmpty()) {
-            System.out.println(
-                    "Product code cannot be empty. Please enter a code."
-            );
-            return;
-        }
+        String code =
+                scanner.nextLine().trim();
 
         for (Product product : products) {
-            if (product.getCode().equalsIgnoreCase(code)) {
-                System.out.println("\nProduct found:");
-                printProduct(product);
+
+            if (product.getCode()
+                    .equalsIgnoreCase(code)) {
+
+                System.out.println(
+                        "Product found:"
+                );
+
+                printTableHeader();
+
+                product.displayProduct();
+
+                System.out.println();
+                System.out.println(
+                        "Debug information:"
+                );
+
+                System.out.println(product);
+
                 return;
             }
         }
 
-        System.out.println("No product found with code: " + code);
-    }
-
-    private static String showMenu(Scanner scanner) {
-        System.out.println("\n===== ShopFlow =====");
-        System.out.println("1. View all products");
-        System.out.println("2. Add a new product");
-        System.out.println("3. Search product by code");
-        System.out.println("4. Exit");
-        System.out.print("Enter your choice: ");
-
-        return scanner.nextLine().trim();
-    }
-
-    private static void printProduct(Product product) {
-        product.displayProduct();
-    }
-
-    private static void printTableHeader() {
-        System.out.printf(
-                "%-10s %-20s %10s %10s%n",
-                "Code",
-                "Name",
-                "Price",
-                "Quantity"
+        System.out.println(
+                "Product not found."
         );
     }
 
-    private static void exitMessage() {
-        System.out.println("Thank you for using ShopFlow!");
+    public static void printTableHeader() {
+
+        System.out.printf(
+                "%-10s %-20s %-20s %10s %10s%n",
+                "Code",
+                "Name",
+                "Category",
+                "Price",
+                "Stock"
+        );
+
+        System.out.println(
+                "--------------------------------------------------------------------------"
+        );
+    }
+
+    public static void exitMessage() {
+
+        System.out.println(
+                "Thank you for using ShopFlow."
+        );
     }
 }
