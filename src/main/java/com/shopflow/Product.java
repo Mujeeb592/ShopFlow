@@ -1,3 +1,4 @@
+
 package com.shopflow;
 
 public class Product {
@@ -36,6 +37,19 @@ public class Product {
 
     public int getQuantity() {
         return quantity;
+    }
+
+    public boolean reduceStock(int quantityToReduce) {
+        if (quantityToReduce <= 0) {
+            return false;
+        }
+
+        if (quantityToReduce > this.quantity) {
+            return false;
+        }
+
+        this.quantity -= quantityToReduce;
+        return true;
     }
 
     public double getStockValue() {

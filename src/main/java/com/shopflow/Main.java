@@ -1,350 +1,393 @@
+
 package com.shopflow;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 public class Main {
 
+    private static final Scanner scanner = new Scanner(System.in);
+
+    private static final List<Product> products = new ArrayList<>();
+    private static final List<Customer> customers = new ArrayList<>();
+    private static final List<Order> orders = new ArrayList<>();
+
     public static void main(String[] args) {
 
-        Scanner scanner = new Scanner(System.in);
-        ArrayList<Product> products = new ArrayList<>();
-
-        runMenu(scanner, products);
-
-        scanner.close();
-    }
-
-    public static void runMenu(
-            Scanner scanner,
-            ArrayList<Product> products) {
+        // Sample products for testing
+        products.add(new Product("101", "Keyboard", "Accessories", 1500, 10));
+        products.add(new Product("102", "Mouse", "Accessories", 800, 15));
+        products.add(new Product("103", "Monitor", "Electronics", 25000, 5));
 
         boolean running = true;
 
         while (running) {
-
-            showMenu();
+            System.out.println("\n========== SHOPFLOW MENU ==========");
+            System.out.println("1. View Products");
+            System.out.println("2. Add Product");
+            System.out.println("3. Search Product by Code");
+            System.out.println("4. Register Customer");
+            System.out.println("5. Place Order");
+            System.out.println("6. View Order / Receipt");
+            System.out.println("7. Exit");
+            System.out.print("Enter your choice: ");
 
             String choice = scanner.nextLine().trim();
 
             switch (choice) {
-
                 case "1":
-                    viewAllProducts(products);
+                    viewProducts();
                     break;
-
                 case "2":
-                    addProduct(scanner, products);
+                    addProduct();
                     break;
-
                 case "3":
-                    searchProduct(scanner, products);
+                    searchProduct();
                     break;
-
                 case "4":
-                    exitMessage();
-                    running = false;
+                    registerCustomer();
                     break;
-
+                case "5":
+                    placeOrder();
+                    break;
+                case "6":
+                    viewOrder();
+                    break;
+                case "7":
+                    running = false;
+                    System.out.println("Thank you for using ShopFlow!");
+                    break;
                 default:
-                    System.out.println(
-                            "Invalid option. Please choose 1-4."
-                    );
+                    System.out.println("Invalid choice. Please select 1-7.");
             }
         }
+
+        scanner.close();
     }
 
-    public static void showMenu() {
-
-        System.out.println();
-        System.out.println("===== ShopFlow Menu =====");
-        System.out.println("1. View all products");
-        System.out.println("2. Add product");
-        System.out.println("3. Search by code");
-        System.out.println("4. Exit");
-        System.out.print("Enter your choice: ");
-    }
-
-    public static void viewAllProducts(
-            ArrayList<Product> products) {
-
+    private static void viewProducts() {
         if (products.isEmpty()) {
-            System.out.println("No products found.");
+            System.out.println("No products available.");
             return;
         }
 
-        printTableHeader();
+        System.out.println("\n---------------- PRODUCT LIST ----------------");
+        System.out.printf("%-10s %-20s %-20s %10s %10s%n",
+                "Code", "Name", "Category", "Price", "Stock");
 
         for (Product product : products) {
             product.displayProduct();
         }
 
-        System.out.println();
-        System.out.println(
-                "Total products: " + products.size()
-        );
-
-        double totalStockValue = 0;
-
+        double stockValue = 0;
         for (Product product : products) {
-            totalStockValue += product.getStockValue();
+            stockValue += product.getStockValue();
         }
 
-        System.out.printf(
-                "Total stock value: %.2f%n",
-                totalStockValue
-        );
+        System.out.println("----------------------------------------------");
+        System.out.println("Total products: " + products.size());
+        System.out.printf("Total stock value: Rs. %.2f%n", stockValue);
     }
 
-    public static void addProduct(
-            Scanner scanner,
-            ArrayList<Product> products) {
+    private static void addProduct() {
+        System.out.println("\n========== ADD PRODUCT ==========");
 
-        Product product = createProduct(scanner, products);
+        String code = readNonEmpty("Enter numeric product code: ");
 
-        if (product != null) {
+        if (!code.matches("\\d+")) {
+            System.out.println("Product code must contain digits only.");
+            return;
+        }
 
-            products.add(product);
+        if (findProduct(code) != null) {
+            System.out.println("Product code already exists.");
+            return;
+        }
 
+        String name = readNonEmpty("Enter product name: ");
+        String category = readNonEmpty("Enter category: ");
+
+        double price = readPositivePrice("Enter price: ");
+        if (price <= 0) {
+            System.out.println("Price must be greater than zero.");
+            return;
+        }
+
+        int quantity = readNonNegativeInt("Enter opening stock: ");
+        if (quantity < 0) {
+            System.out.println("Stock cannot be negative.");
+            return;
+        }
+
+        products.add(new Product(code, name, category, price, quantity));
+        System.out.println("Product added successfully.");
+    }
+
+    private static void searchProduct() {
+        String code = readNonEmpty("Enter product code to search: ");
+        Product product = findProduct(code);
+
+        if (product == null) {
+            System.out.println("Product not found.");
+        } else {
+            System.out.printf("%-10s %-20s %-20s %10s %10s%n",
+                    "Code", "Name", "Category", "Price", "Stock");
+            product.displayProduct();
+        }
+    }
+
+    private static void registerCustomer() {
+        System.out.println("\n========== REGISTER CUSTOMER ==========");
+
+        String name = readNonEmpty("Enter customer name: ");
+        String email = readNonEmpty("Enter email: ");
+        String phone = readNonEmpty("Enter phone: ");
+
+        int id = customers.size() + 1;
+
+        Customer customer = new Customer(id, name, email, phone);
+        customers.add(customer);
+
+        System.out.println("\nCustomer registered successfully!");
+        System.out.println(customer);
+    }
+
+    private static void placeOrder() {
+        System.out.println("\n========== PLACE ORDER ==========");
+
+        if (customers.isEmpty()) {
             System.out.println(
-                    "Product added successfully."
+                    "No customers registered. Register a customer first."
             );
+            return;
         }
-    }
 
-    public static Product createProduct(
-            Scanner scanner,
-            ArrayList<Product> products) {
+        if (products.isEmpty()) {
+            System.out.println("No products available to order.");
+            return;
+        }
 
-        String code;
+        System.out.println("\nRegistered Customers:");
+        for (Customer customer : customers) {
+            System.out.println(customer.getId() + ". "
+                    + customer.getName() + " (" + customer.getEmail() + ")");
+        }
+
+        int customerId = readPositiveInt("Enter customer ID: ");
+        if (customerId <= 0) {
+            System.out.println("Invalid customer ID.");
+            return;
+        }
+
+        Customer customer = findCustomer(customerId);
+        if (customer == null) {
+            System.out.println("Customer not found. Order cancelled.");
+            return;
+        }
+
+        viewProducts();
+
+        System.out.println("\nEnter product codes and quantities.");
+        System.out.println("Type DONE as the product code to finish.");
+
+        // LinkedHashMap preserves selection order.
+        // Selecting the same product twice combines its quantities.
+        Map<Product, Integer> requestedItems = new LinkedHashMap<>();
 
         while (true) {
+            System.out.print("\nProduct code (or DONE): ");
+            String code = scanner.nextLine().trim();
 
-            System.out.print("Enter product code: ");
-            code = scanner.nextLine().trim();
-
-            if (code.isEmpty()) {
-                System.out.println(
-                        "Code cannot be empty."
-                );
-                continue;
-            }
-
-            if (!code.matches("\\d+")) {
-                System.out.println(
-                        "Code must contain numbers only."
-                );
-                continue;
-            }
-
-            boolean duplicate = false;
-
-            for (Product product : products) {
-
-                if (product.getCode()
-                        .equalsIgnoreCase(code)) {
-
-                    duplicate = true;
-                    break;
-                }
-            }
-
-            if (duplicate) {
-
-                System.out.println(
-                        "Product code already exists."
-                );
-
-            } else {
-
+            if (code.equalsIgnoreCase("DONE")) {
                 break;
             }
-        }
 
-        String name;
+            Product product = findProduct(code);
 
-        while (true) {
-
-            System.out.print("Enter product name: ");
-            name = scanner.nextLine().trim();
-
-            if (name.isEmpty()) {
-
-                System.out.println(
-                        "Name cannot be empty."
-                );
+            if (product == null) {
+                System.out.println("Product not found. Try again.");
                 continue;
             }
 
-            if (!name.matches("[a-zA-Z ]+")) {
+            System.out.print("Enter quantity: ");
+            String quantityInput = scanner.nextLine().trim();
 
-                System.out.println(
-                        "Name must contain letters and spaces only."
-                );
-                continue;
-            }
-
-            break;
-        }
-
-        String category;
-
-        while (true) {
-
-            System.out.print("Enter product category: ");
-            category = scanner.nextLine().trim();
-
-            if (category.isEmpty()) {
-
-                System.out.println(
-                        "Category cannot be empty."
-                );
-                continue;
-            }
-
-            if (!category.matches("[a-zA-Z ]+")) {
-
-                System.out.println(
-                        "Category must contain letters and spaces only."
-                );
-                continue;
-            }
-
-            break;
-        }
-
-        double price;
-
-        while (true) {
-
-            System.out.print("Enter product price: ");
-
-            String priceInput =
-                    scanner.nextLine().trim();
-
+            int quantity;
             try {
-
-                price = Double.parseDouble(priceInput);
-
-                if (price <= 0) {
-
-                    System.out.println(
-                            "Price must be greater than 0."
-                    );
-                    continue;
-                }
-
-                break;
-
+                quantity = Integer.parseInt(quantityInput);
             } catch (NumberFormatException e) {
-
-                System.out.println(
-                        "Invalid price. Please enter a number."
-                );
+                System.out.println("Quantity must be a whole number.");
+                continue;
             }
+
+            if (quantity <= 0) {
+                System.out.println("Quantity must be greater than zero.");
+                continue;
+            }
+
+            int previousQuantity = requestedItems.getOrDefault(product, 0);
+
+            if (quantity > product.getQuantity() - previousQuantity) {
+                System.out.println(
+                        "Insufficient stock. Available stock: "
+                                + product.getQuantity()
+                                + ", already requested: " + previousQuantity
+                );
+                continue;
+            }
+
+            requestedItems.put(product, previousQuantity + quantity);
+
+            System.out.println("Item added to order.");
         }
 
-        int quantity;
-
-        while (true) {
-
-            System.out.print("Enter stock quantity: ");
-
-            String quantityInput =
-                    scanner.nextLine().trim();
-
-            try {
-
-                quantity =
-                        Integer.parseInt(quantityInput);
-
-                if (quantity < 0) {
-
-                    System.out.println(
-                            "Stock quantity cannot be negative."
-                    );
-                    continue;
-                }
-
-                break;
-
-            } catch (NumberFormatException e) {
-
-                System.out.println(
-                        "Invalid quantity. Please enter a whole number."
-                );
-            }
+        if (requestedItems.isEmpty()) {
+            System.out.println("No items selected. Order cancelled.");
+            return;
         }
 
-        return new Product(
-                code,
-                name,
-                category,
-                price,
-                quantity
-        );
-    }
-
-    public static void searchProduct(
-            Scanner scanner,
-            ArrayList<Product> products) {
-
-        System.out.print(
-                "Enter product code to search: "
-        );
-
-        String code =
-                scanner.nextLine().trim();
-
-        for (Product product : products) {
-
-            if (product.getCode()
-                    .equalsIgnoreCase(code)) {
-
+        // Validate every product before changing any stock.
+        for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
+            if (entry.getValue() > entry.getKey().getQuantity()) {
                 System.out.println(
-                        "Product found:"
+                        "Order refused: insufficient stock for "
+                                + entry.getKey().getName()
                 );
-
-                printTableHeader();
-
-                product.displayProduct();
-
-                System.out.println();
-                System.out.println(
-                        "Debug information:"
-                );
-
-                System.out.println(product);
-
                 return;
             }
         }
 
-        System.out.println(
-                "Product not found."
-        );
+        int orderId = orders.size() + 1;
+        Order order = new Order(orderId, customer);
+
+        for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
+            order.addItem(new OrderItem(entry.getKey(), entry.getValue()));
+        }
+
+        // Reduce stock only after the complete order has been validated.
+        for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
+            boolean reduced = entry.getKey().reduceStock(entry.getValue());
+
+            if (!reduced) {
+                // Defensive check; normally validation prevents this.
+                System.out.println(
+                        "Stock update failed. Please review inventory."
+                );
+                return;
+            }
+        }
+
+        orders.add(order);
+
+        System.out.println("\nOrder placed successfully!");
+        order.printReceipt();
     }
 
-    public static void printTableHeader() {
+    private static void viewOrder() {
+        if (orders.isEmpty()) {
+            System.out.println("No orders found.");
+            return;
+        }
 
-        System.out.printf(
-                "%-10s %-20s %-20s %10s %10s%n",
-                "Code",
-                "Name",
-                "Category",
-                "Price",
-                "Stock"
-        );
+        System.out.println("\n========== EXISTING ORDERS ==========");
 
-        System.out.println(
-                "--------------------------------------------------------------------------"
-        );
+        for (Order order : orders) {
+            System.out.println("Order ID: " + order.getId()
+                    + " | Customer: " + order.getCustomer().getName()
+                    + " | Date: " + order.getDate()
+                    + " | Total: Rs. " + String.format("%.2f", order.getTotal()));
+        }
+
+        int orderId = readPositiveInt("Enter order ID to view receipt: ");
+        if (orderId <= 0) {
+            System.out.println("Invalid order ID.");
+            return;
+        }
+
+        Order order = findOrder(orderId);
+
+        if (order == null) {
+            System.out.println("Order not found.");
+        } else {
+            order.printReceipt();
+        }
     }
 
-    public static void exitMessage() {
+    private static Product findProduct(String code) {
+        for (Product product : products) {
+            if (product.getCode().equalsIgnoreCase(code)) {
+                return product;
+            }
+        }
+        return null;
+    }
 
-        System.out.println(
-                "Thank you for using ShopFlow."
-        );
+    private static Customer findCustomer(int id) {
+        for (Customer customer : customers) {
+            if (customer.getId() == id) {
+                return customer;
+            }
+        }
+        return null;
+    }
+
+    private static Order findOrder(int id) {
+        for (Order order : orders) {
+            if (order.getId() == id) {
+                return order;
+            }
+        }
+        return null;
+    }
+
+    private static String readNonEmpty(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine().trim();
+
+            if (!input.isEmpty()) {
+                return input;
+            }
+
+            System.out.println("This field cannot be empty.");
+        }
+    }
+
+    private static int readPositiveInt(String prompt) {
+        System.out.print(prompt);
+        try {
+            int value = Integer.parseInt(scanner.nextLine().trim());
+            return value > 0 ? value : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private static int readNonNegativeInt(String prompt) {
+        System.out.print(prompt);
+        try {
+            int value = Integer.parseInt(scanner.nextLine().trim());
+            return value >= 0 ? value : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private static double readPositivePrice(String prompt) {
+        System.out.print(prompt);
+        try {
+            double value = Double.parseDouble(scanner.nextLine().trim());
+
+            if (!Double.isFinite(value) || value <= 0) {
+                return -1;
+            }
+
+            return value;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 }
