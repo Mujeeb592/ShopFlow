@@ -17,7 +17,6 @@ public class Main {
 
     public static void main(String[] args) {
 
-        // Sample products for testing
         products.add(new Product("101", "Keyboard", "Accessories", 1500, 10));
         products.add(new Product("102", "Mouse", "Accessories", 800, 15));
         products.add(new Product("103", "Monitor", "Electronics", 25000, 5));
@@ -32,7 +31,8 @@ public class Main {
             System.out.println("4. Register Customer");
             System.out.println("5. Place Order");
             System.out.println("6. View Order / Receipt");
-            System.out.println("7. Exit");
+            System.out.println("7. Change Order Status");
+            System.out.println("8. Exit");
             System.out.print("Enter your choice: ");
 
             String choice = scanner.nextLine().trim();
@@ -57,11 +57,14 @@ public class Main {
                     viewOrder();
                     break;
                 case "7":
+                    changeOrderStatus();
+                    break;
+                case "8":
                     running = false;
                     System.out.println("Thank you for using ShopFlow!");
                     break;
                 default:
-                    System.out.println("Invalid choice. Please select 1-7.");
+                    System.out.println("Invalid choice. Please select 1-8.");
             }
         }
 
@@ -193,8 +196,6 @@ public class Main {
         System.out.println("\nEnter product codes and quantities.");
         System.out.println("Type DONE as the product code to finish.");
 
-        // LinkedHashMap preserves selection order.
-        // Selecting the same product twice combines its quantities.
         Map<Product, Integer> requestedItems = new LinkedHashMap<>();
 
         while (true) {
@@ -240,7 +241,6 @@ public class Main {
             }
 
             requestedItems.put(product, previousQuantity + quantity);
-
             System.out.println("Item added to order.");
         }
 
@@ -249,7 +249,6 @@ public class Main {
             return;
         }
 
-        // Validate every product before changing any stock.
         for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
             if (entry.getValue() > entry.getKey().getQuantity()) {
                 System.out.println(
@@ -267,12 +266,10 @@ public class Main {
             order.addItem(new OrderItem(entry.getKey(), entry.getValue()));
         }
 
-        // Reduce stock only after the complete order has been validated.
         for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
             boolean reduced = entry.getKey().reduceStock(entry.getValue());
 
             if (!reduced) {
-                // Defensive check; normally validation prevents this.
                 System.out.println(
                         "Stock update failed. Please review inventory."
                 );
@@ -298,7 +295,8 @@ public class Main {
             System.out.println("Order ID: " + order.getId()
                     + " | Customer: " + order.getCustomer().getName()
                     + " | Date: " + order.getDate()
-                    + " | Total: Rs. " + String.format("%.2f", order.getTotal()));
+                    + " | Total: Rs. " + String.format("%.2f", order.getTotal())
+                    + " | Status: " + order.getStatus());
         }
 
         int orderId = readPositiveInt("Enter order ID to view receipt: ");
@@ -313,6 +311,62 @@ public class Main {
             System.out.println("Order not found.");
         } else {
             order.printReceipt();
+        }
+    }
+
+    private static void changeOrderStatus() {
+        if (orders.isEmpty()) {
+            System.out.println("No orders available to update.");
+            return;
+        }
+
+        System.out.println("\n========== CHANGE ORDER STATUS ==========");
+
+        for (Order order : orders) {
+            System.out.println("Order ID: " + order.getId()
+                    + " | Customer: " + order.getCustomer().getName()
+                    + " | Current Status: " + order.getStatus());
+        }
+
+        int orderId = readPositiveInt("Enter order ID: ");
+        if (orderId <= 0) {
+            System.out.println("Invalid order ID.");
+            return;
+        }
+
+        Order order = findOrder(orderId);
+        if (order == null) {
+            System.out.println("Order not found.");
+            return;
+        }
+
+        System.out.println("Current status: " + order.getStatus());
+        System.out.println("Available statuses:");
+
+        for (OrderStatus status : OrderStatus.values()) {
+            System.out.println("- " + status);
+        }
+
+        System.out.print("Enter new status: ");
+        String input = scanner.nextLine().trim();
+
+        OrderStatus newStatus;
+        try {
+            newStatus = OrderStatus.valueOf(input.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            System.out.println(
+                    "Invalid status. Please enter one of the listed statuses."
+            );
+            return;
+        }
+
+        try {
+            order.changeStatus(newStatus);
+            System.out.println(
+                    "Order status updated successfully to " + order.getStatus() + "."
+            );
+        } catch (IllegalStateException e) {
+            System.out.println("Status change refused: " + e.getMessage());
         }
     }
 
