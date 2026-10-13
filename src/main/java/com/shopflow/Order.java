@@ -14,6 +14,9 @@ public class Order {
     private final List<OrderItem> items;
     private OrderStatus status;
 
+    private Discount appliedDiscount;
+    private double discountAmount;
+
     public Order(int id, Customer customer) {
         if (id <= 0) {
             throw new IllegalArgumentException(
@@ -32,6 +35,8 @@ public class Order {
         this.date = LocalDate.now();
         this.items = new ArrayList<>();
         this.status = OrderStatus.NEW;
+        this.appliedDiscount = null;
+        this.discountAmount = 0;
     }
 
     public int getId() {
@@ -52,6 +57,14 @@ public class Order {
 
     public OrderStatus getStatus() {
         return status;
+    }
+
+    public Discount getAppliedDiscount() {
+        return appliedDiscount;
+    }
+
+    public double getDiscountAmount() {
+        return discountAmount;
     }
 
     public void changeStatus(OrderStatus newStatus) {
@@ -91,6 +104,32 @@ public class Order {
         return total;
     }
 
+    public void applyDiscount(Discount discount) {
+        if (discount == null) {
+            throw new IllegalArgumentException(
+                    "Discount cannot be null."
+            );
+        }
+
+        double calculatedDiscount = discount.calculateDiscount(this);
+
+        if (calculatedDiscount < 0) {
+            throw new IllegalArgumentException(
+                    "Discount cannot be negative."
+            );
+        }
+
+        this.appliedDiscount = discount;
+        this.discountAmount = Math.min(
+                calculatedDiscount,
+                getTotal()
+        );
+    }
+
+    public double getFinalTotal() {
+        return Math.max(0, getTotal() - discountAmount);
+    }
+
     public void printReceipt() {
         System.out.println("\n==============================================");
         System.out.println("                  SHOPFLOW");
@@ -119,7 +158,25 @@ public class Order {
         }
 
         System.out.println("----------------------------------------------");
-        System.out.printf("ORDER TOTAL: Rs. %.2f%n", getTotal());
+        System.out.printf("SUBTOTAL:          Rs. %.2f%n", getTotal());
+
+        if (appliedDiscount != null) {
+            System.out.println(
+                    "Discount:          " + appliedDiscount.getName()
+            );
+            System.out.printf(
+                    "Discount Amount:   Rs. %.2f%n",
+                    discountAmount
+            );
+        } else {
+            System.out.println("Discount:          None");
+            System.out.printf(
+                    "Discount Amount:   Rs. %.2f%n",
+                    0.0
+            );
+        }
+
+        System.out.printf("FINAL TOTAL:       Rs. %.2f%n", getFinalTotal());
         System.out.println("==============================================");
     }
 }

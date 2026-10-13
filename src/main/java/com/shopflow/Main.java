@@ -32,7 +32,8 @@ public class Main {
             System.out.println("5. Place Order");
             System.out.println("6. View Order / Receipt");
             System.out.println("7. Change Order Status");
-            System.out.println("8. Exit");
+            System.out.println("8. Apply Discount to Order");
+            System.out.println("9. Exit");
             System.out.print("Enter your choice: ");
 
             String choice = scanner.nextLine().trim();
@@ -60,11 +61,14 @@ public class Main {
                     changeOrderStatus();
                     break;
                 case "8":
+                    applyDiscountToOrder();
+                    break;
+                case "9":
                     running = false;
                     System.out.println("Thank you for using ShopFlow!");
                     break;
                 default:
-                    System.out.println("Invalid choice. Please select 1-8.");
+                    System.out.println("Invalid choice. Please select 1-9.");
             }
         }
 
@@ -295,7 +299,9 @@ public class Main {
             System.out.println("Order ID: " + order.getId()
                     + " | Customer: " + order.getCustomer().getName()
                     + " | Date: " + order.getDate()
-                    + " | Total: Rs. " + String.format("%.2f", order.getTotal())
+                    + " | Subtotal: Rs. " + String.format("%.2f", order.getTotal())
+                    + " | Final Total: Rs. "
+                    + String.format("%.2f", order.getFinalTotal())
                     + " | Status: " + order.getStatus());
         }
 
@@ -363,10 +369,104 @@ public class Main {
         try {
             order.changeStatus(newStatus);
             System.out.println(
-                    "Order status updated successfully to " + order.getStatus() + "."
+                    "Order status updated successfully to "
+                            + order.getStatus() + "."
             );
         } catch (IllegalStateException e) {
             System.out.println("Status change refused: " + e.getMessage());
+        }
+    }
+
+    private static void applyDiscountToOrder() {
+        if (orders.isEmpty()) {
+            System.out.println("No orders available to apply a discount.");
+            return;
+        }
+
+        System.out.println("\n========== APPLY DISCOUNT ==========");
+
+        for (Order order : orders) {
+            System.out.println("Order ID: " + order.getId()
+                    + " | Customer: " + order.getCustomer().getName()
+                    + " | Subtotal: Rs. "
+                    + String.format("%.2f", order.getTotal())
+                    + " | Current Discount: "
+                    + (order.getAppliedDiscount() == null
+                    ? "None" : order.getAppliedDiscount().getName()));
+        }
+
+        int orderId = readPositiveInt("Enter order ID: ");
+
+        if (orderId <= 0) {
+            System.out.println("Invalid order ID.");
+            return;
+        }
+
+        Order order = findOrder(orderId);
+
+        if (order == null) {
+            System.out.println("Order not found.");
+            return;
+        }
+
+        System.out.println("\nSelect discount type:");
+        System.out.println("1. Percentage Discount");
+        System.out.println("2. Flat Amount Discount");
+        System.out.println("3. Buy 3 Get 1 Free");
+        System.out.print("Enter your choice: ");
+
+        String choice = scanner.nextLine().trim();
+
+        Discount discount;
+
+        try {
+            switch (choice) {
+                case "1":
+                    double percentage = readPositivePrice(
+                            "Enter percentage (1-100): "
+                    );
+
+                    if (percentage <= 0 || percentage > 100) {
+                        System.out.println(
+                                "Percentage must be greater than 0 and at most 100."
+                        );
+                        return;
+                    }
+
+                    discount = new PercentageDiscount(percentage);
+                    break;
+
+                case "2":
+                    double amount = readPositivePrice(
+                            "Enter flat discount amount in Rs.: "
+                    );
+
+                    if (amount <= 0) {
+                        System.out.println(
+                                "Discount amount must be greater than zero."
+                        );
+                        return;
+                    }
+
+                    discount = new FlatDiscount(amount);
+                    break;
+
+                case "3":
+                    discount = new BuyThreeGetOneFreeDiscount();
+                    break;
+
+                default:
+                    System.out.println("Invalid discount choice.");
+                    return;
+            }
+
+            order.applyDiscount(discount);
+
+            System.out.println("\nDiscount applied successfully!");
+            order.printReceipt();
+
+        } catch (IllegalArgumentException e) {
+            System.out.println("Could not apply discount: " + e.getMessage());
         }
     }
 
