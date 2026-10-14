@@ -1,6 +1,8 @@
 
 package com.shopflow;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,15 +13,26 @@ public class Main {
 
     private static final Scanner scanner = new Scanner(System.in);
 
+    private static final BigDecimal ZERO_MONEY = new BigDecimal("0.00");
+    private static final RoundingMode ROUNDING_RULE = RoundingMode.HALF_UP;
+
     private static final List<Product> products = new ArrayList<>();
     private static final List<Customer> customers = new ArrayList<>();
     private static final List<Order> orders = new ArrayList<>();
 
     public static void main(String[] args) {
 
-        products.add(new Product("101", "Keyboard", "Accessories", 1500, 10));
-        products.add(new Product("102", "Mouse", "Accessories", 800, 15));
-        products.add(new Product("103", "Monitor", "Electronics", 25000, 5));
+        products.add(new Product(
+                "101", "Keyboard", "Accessories",
+                new BigDecimal("1500.00"), 10));
+
+        products.add(new Product(
+                "102", "Mouse", "Accessories",
+                new BigDecimal("800.00"), 15));
+
+        products.add(new Product(
+                "103", "Monitor", "Electronics",
+                new BigDecimal("25000.00"), 5));
 
         boolean running = true;
 
@@ -85,18 +98,16 @@ public class Main {
         System.out.printf("%-10s %-20s %-20s %10s %10s%n",
                 "Code", "Name", "Category", "Price", "Stock");
 
+        BigDecimal stockValue = ZERO_MONEY;
+
         for (Product product : products) {
             product.displayProduct();
-        }
-
-        double stockValue = 0;
-        for (Product product : products) {
-            stockValue += product.getStockValue();
+            stockValue = stockValue.add(product.getStockValue());
         }
 
         System.out.println("----------------------------------------------");
         System.out.println("Total products: " + products.size());
-        System.out.printf("Total stock value: Rs. %.2f%n", stockValue);
+        System.out.println("Total stock value: Rs. " + formatMoney(stockValue));
     }
 
     private static void addProduct() {
@@ -117,13 +128,15 @@ public class Main {
         String name = readNonEmpty("Enter product name: ");
         String category = readNonEmpty("Enter category: ");
 
-        double price = readPositivePrice("Enter price: ");
-        if (price <= 0) {
-            System.out.println("Price must be greater than zero.");
+        BigDecimal price = readPositivePrice("Enter price: ");
+
+        if (price == null) {
+            System.out.println("Enter a valid price greater than zero.");
             return;
         }
 
         int quantity = readNonNegativeInt("Enter opening stock: ");
+
         if (quantity < 0) {
             System.out.println("Stock cannot be negative.");
             return;
@@ -178,18 +191,21 @@ public class Main {
         }
 
         System.out.println("\nRegistered Customers:");
+
         for (Customer customer : customers) {
             System.out.println(customer.getId() + ". "
                     + customer.getName() + " (" + customer.getEmail() + ")");
         }
 
         int customerId = readPositiveInt("Enter customer ID: ");
+
         if (customerId <= 0) {
             System.out.println("Invalid customer ID.");
             return;
         }
 
         Customer customer = findCustomer(customerId);
+
         if (customer == null) {
             System.out.println("Customer not found. Order cancelled.");
             return;
@@ -221,6 +237,7 @@ public class Main {
             String quantityInput = scanner.nextLine().trim();
 
             int quantity;
+
             try {
                 quantity = Integer.parseInt(quantityInput);
             } catch (NumberFormatException e) {
@@ -299,13 +316,13 @@ public class Main {
             System.out.println("Order ID: " + order.getId()
                     + " | Customer: " + order.getCustomer().getName()
                     + " | Date: " + order.getDate()
-                    + " | Subtotal: Rs. " + String.format("%.2f", order.getTotal())
-                    + " | Final Total: Rs. "
-                    + String.format("%.2f", order.getFinalTotal())
+                    + " | Subtotal: Rs. " + formatMoney(order.getTotal())
+                    + " | Final Total: Rs. " + formatMoney(order.getFinalTotal())
                     + " | Status: " + order.getStatus());
         }
 
         int orderId = readPositiveInt("Enter order ID to view receipt: ");
+
         if (orderId <= 0) {
             System.out.println("Invalid order ID.");
             return;
@@ -335,12 +352,14 @@ public class Main {
         }
 
         int orderId = readPositiveInt("Enter order ID: ");
+
         if (orderId <= 0) {
             System.out.println("Invalid order ID.");
             return;
         }
 
         Order order = findOrder(orderId);
+
         if (order == null) {
             System.out.println("Order not found.");
             return;
@@ -357,6 +376,7 @@ public class Main {
         String input = scanner.nextLine().trim();
 
         OrderStatus newStatus;
+
         try {
             newStatus = OrderStatus.valueOf(input.toUpperCase());
         } catch (IllegalArgumentException e) {
@@ -388,8 +408,7 @@ public class Main {
         for (Order order : orders) {
             System.out.println("Order ID: " + order.getId()
                     + " | Customer: " + order.getCustomer().getName()
-                    + " | Subtotal: Rs. "
-                    + String.format("%.2f", order.getTotal())
+                    + " | Subtotal: Rs. " + formatMoney(order.getTotal())
                     + " | Current Discount: "
                     + (order.getAppliedDiscount() == null
                     ? "None" : order.getAppliedDiscount().getName()));
@@ -422,11 +441,13 @@ public class Main {
         try {
             switch (choice) {
                 case "1":
-                    double percentage = readPositivePrice(
-                            "Enter percentage (1-100): "
+                    BigDecimal percentage = readPositivePrice(
+                            "Enter percentage (greater than 0, up to 100): "
                     );
 
-                    if (percentage <= 0 || percentage > 100) {
+                    if (percentage == null
+                            || percentage.compareTo(BigDecimal.ZERO) <= 0
+                            || percentage.compareTo(new BigDecimal("100")) > 0) {
                         System.out.println(
                                 "Percentage must be greater than 0 and at most 100."
                         );
@@ -437,11 +458,12 @@ public class Main {
                     break;
 
                 case "2":
-                    double amount = readPositivePrice(
+                    BigDecimal amount = readPositivePrice(
                             "Enter flat discount amount in Rs.: "
                     );
 
-                    if (amount <= 0) {
+                    if (amount == null
+                            || amount.compareTo(BigDecimal.ZERO) <= 0) {
                         System.out.println(
                                 "Discount amount must be greater than zero."
                         );
@@ -512,6 +534,7 @@ public class Main {
 
     private static int readPositiveInt(String prompt) {
         System.out.print(prompt);
+
         try {
             int value = Integer.parseInt(scanner.nextLine().trim());
             return value > 0 ? value : -1;
@@ -522,6 +545,7 @@ public class Main {
 
     private static int readNonNegativeInt(String prompt) {
         System.out.print(prompt);
+
         try {
             int value = Integer.parseInt(scanner.nextLine().trim());
             return value >= 0 ? value : -1;
@@ -530,18 +554,23 @@ public class Main {
         }
     }
 
-    private static double readPositivePrice(String prompt) {
+    private static BigDecimal readPositivePrice(String prompt) {
         System.out.print(prompt);
-        try {
-            double value = Double.parseDouble(scanner.nextLine().trim());
 
-            if (!Double.isFinite(value) || value <= 0) {
-                return -1;
+        try {
+            BigDecimal value = new BigDecimal(scanner.nextLine().trim());
+
+            if (value.compareTo(BigDecimal.ZERO) <= 0) {
+                return null;
             }
 
             return value;
         } catch (NumberFormatException e) {
-            return -1;
+            return null;
         }
+    }
+
+    private static String formatMoney(BigDecimal amount) {
+        return amount.setScale(2, ROUNDING_RULE).toPlainString();
     }
 }

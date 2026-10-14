@@ -1,21 +1,24 @@
 
 package com.shopflow;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 public class Product {
 
     private String code;
     private String name;
     private String category;
-    private double price;
+    private BigDecimal price;
     private int quantity;
 
     public Product(String code, String name, String category,
-                   double price, int quantity) {
+                   BigDecimal price, int quantity) {
 
         this.code = code;
         this.name = name;
         this.category = category;
-        this.price = price;
+        this.price = price.setScale(2, RoundingMode.HALF_UP);
         this.quantity = quantity;
     }
 
@@ -31,7 +34,7 @@ public class Product {
         return category;
     }
 
-    public double getPrice() {
+    public BigDecimal getPrice() {
         return price;
     }
 
@@ -52,17 +55,18 @@ public class Product {
         return true;
     }
 
-    public double getStockValue() {
-        return price * quantity;
+    public BigDecimal getStockValue() {
+        return price.multiply(BigDecimal.valueOf(quantity))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     public void displayProduct() {
         System.out.printf(
-                "%-10s %-20s %-20s %10.2f %10d%n",
+                "%-10s %-20s %-20s %10s %10d%n",
                 code,
                 name,
                 category,
-                price,
+                price.toPlainString(),
                 quantity
         );
     }
@@ -73,7 +77,7 @@ public class Product {
                 "code='" + code + '\'' +
                 ", name='" + name + '\'' +
                 ", category='" + category + '\'' +
-                ", price=" + price +
+                ", price=" + price.toPlainString() +
                 ", quantity=" + quantity +
                 '}';
     }

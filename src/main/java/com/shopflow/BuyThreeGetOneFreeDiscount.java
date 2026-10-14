@@ -1,6 +1,8 @@
 
 package com.shopflow;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -13,14 +15,14 @@ public class BuyThreeGetOneFreeDiscount implements Discount {
     }
 
     @Override
-    public double calculateDiscount(Order order) {
+    public BigDecimal calculateDiscount(Order order) {
         if (order == null) {
             throw new IllegalArgumentException(
                     "Order cannot be null."
             );
         }
 
-        List<Double> unitPrices = new ArrayList<>();
+        List<BigDecimal> unitPrices = new ArrayList<>();
 
         for (OrderItem item : order.getItems()) {
             for (int i = 0; i < item.getQuantity(); i++) {
@@ -29,17 +31,18 @@ public class BuyThreeGetOneFreeDiscount implements Discount {
         }
 
         if (unitPrices.size() < 4) {
-            return 0;
+            return BigDecimal.ZERO.setScale(2);
         }
 
         unitPrices.sort(Collections.reverseOrder());
 
-        double discount = 0;
+        BigDecimal discount = BigDecimal.ZERO.setScale(2);
 
         for (int i = 3; i < unitPrices.size(); i += 4) {
-            discount += unitPrices.get(i);
+            discount = discount.add(unitPrices.get(i));
         }
 
-        return Math.min(discount, order.getTotal());
+        return discount.min(order.getTotal())
+                .setScale(2, RoundingMode.HALF_UP);
     }
 }

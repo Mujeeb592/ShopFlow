@@ -1,12 +1,17 @@
 
 package com.shopflow;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class Order {
+
+    private static final int MONEY_SCALE = 2;
+    private static final RoundingMode ROUNDING_RULE = RoundingMode.HALF_UP;
 
     private final int id;
     private final Customer customer;
@@ -15,7 +20,7 @@ public class Order {
     private OrderStatus status;
 
     private Discount appliedDiscount;
-    private double discountAmount;
+    private BigDecimal discountAmount;
 
     public Order(int id, Customer customer) {
         if (id <= 0) {
@@ -36,7 +41,7 @@ public class Order {
         this.items = new ArrayList<>();
         this.status = OrderStatus.NEW;
         this.appliedDiscount = null;
-        this.discountAmount = 0;
+        this.discountAmount = BigDecimal.ZERO.setScale(MONEY_SCALE);
     }
 
     public int getId() {
@@ -63,7 +68,7 @@ public class Order {
         return appliedDiscount;
     }
 
-    public double getDiscountAmount() {
+    public BigDecimal getDiscountAmount() {
         return discountAmount;
     }
 
@@ -94,14 +99,14 @@ public class Order {
         items.add(item);
     }
 
-    public double getTotal() {
-        double total = 0;
+    public BigDecimal getTotal() {
+        BigDecimal total = BigDecimal.ZERO.setScale(MONEY_SCALE);
 
         for (OrderItem item : items) {
-            total += item.getLineTotal();
+            total = total.add(item.getLineTotal());
         }
 
-        return total;
+        return total.setScale(MONEY_SCALE, ROUNDING_RULE);
     }
 
     public void applyDiscount(Discount discount) {
@@ -111,23 +116,26 @@ public class Order {
             );
         }
 
-        double calculatedDiscount = discount.calculateDiscount(this);
+        BigDecimal calculatedDiscount = discount.calculateDiscount(this)
+                .setScale(MONEY_SCALE, ROUNDING_RULE);
 
-        if (calculatedDiscount < 0) {
+        if (calculatedDiscount.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException(
                     "Discount cannot be negative."
             );
         }
 
         this.appliedDiscount = discount;
-        this.discountAmount = Math.min(
-                calculatedDiscount,
-                getTotal()
-        );
+
+        this.discountAmount = calculatedDiscount.min(getTotal())
+                .setScale(MONEY_SCALE, ROUNDING_RULE);
     }
 
-    public double getFinalTotal() {
-        return Math.max(0, getTotal() - discountAmount);
+    public BigDecimal getFinalTotal() {
+        return getTotal()
+                .subtract(discountAmount)
+                .max(BigDecimal.ZERO.setScale(MONEY_SCALE))
+                .setScale(MONEY_SCALE, ROUNDING_RULE);
     }
 
     public void printReceipt() {
@@ -150,33 +158,32 @@ public class Order {
         System.out.println("----------------------------------------------");
 
         for (OrderItem item : items) {
-            System.out.printf("%-18s %5d %9.2f %10.2f%n",
+            System.out.printf("%-18s %5d %9s %10s%n",
                     item.getProduct().getName(),
                     item.getQuantity(),
-                    item.getPriceAtPurchase(),
-                    item.getLineTotal());
+                    item.getPriceAtPurchase().toPlainString(),
+                    item.getLineTotal().toPlainString());
         }
 
         System.out.println("----------------------------------------------");
-        System.out.printf("SUBTOTAL:          Rs. %.2f%n", getTotal());
+        System.out.println("SUBTOTAL:          Rs. " + getTotal().toPlainString());
 
         if (appliedDiscount != null) {
             System.out.println(
                     "Discount:          " + appliedDiscount.getName()
             );
-            System.out.printf(
-                    "Discount Amount:   Rs. %.2f%n",
-                    discountAmount
-            );
         } else {
             System.out.println("Discount:          None");
-            System.out.printf(
-                    "Discount Amount:   Rs. %.2f%n",
-                    0.0
-            );
         }
 
-        System.out.printf("FINAL TOTAL:       Rs. %.2f%n", getFinalTotal());
+        System.out.println(
+                "Discount Amount:   Rs. " + discountAmount.toPlainString()
+        );
+
+        System.out.println(
+                "FINAL TOTAL:       Rs. " + getFinalTotal().toPlainString()
+        );
+
         System.out.println("==============================================");
     }
 }
