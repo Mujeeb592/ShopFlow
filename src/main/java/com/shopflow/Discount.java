@@ -1,9 +1,11 @@
 
 package com.shopflow;
 
+import java.math.BigDecimal;
+
 public interface Discount {
 
     String getName();
 
-    double calculateDiscount(Order order);
+    BigDecimal calculateDiscount(Order order);
 }

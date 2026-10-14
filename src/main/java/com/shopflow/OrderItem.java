@@ -1,12 +1,15 @@
 
 package com.shopflow;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 public class OrderItem {
 
     private final Product product;
     private final int quantity;
-    private final double priceAtPurchase;
-    private final double lineTotal;
+    private final BigDecimal priceAtPurchase;
+    private final BigDecimal lineTotal;
 
     public OrderItem(Product product, int quantity) {
         if (product == null) {
@@ -24,7 +27,10 @@ public class OrderItem {
         this.product = product;
         this.quantity = quantity;
         this.priceAtPurchase = product.getPrice();
-        this.lineTotal = priceAtPurchase * quantity;
+
+        this.lineTotal = priceAtPurchase
+                .multiply(BigDecimal.valueOf(quantity))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     public Product getProduct() {
@@ -35,11 +41,11 @@ public class OrderItem {
         return quantity;
     }
 
-    public double getPriceAtPurchase() {
+    public BigDecimal getPriceAtPurchase() {
         return priceAtPurchase;
     }
 
-    public double getLineTotal() {
+    public BigDecimal getLineTotal() {
         return lineTotal;
     }
 }
