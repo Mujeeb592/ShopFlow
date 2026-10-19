@@ -4,9 +4,12 @@ package com.shopflow;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Scanner;
 
 public class Main {
@@ -46,7 +49,8 @@ public class Main {
             System.out.println("6. View Order / Receipt");
             System.out.println("7. Change Order Status");
             System.out.println("8. Apply Discount to Order");
-            System.out.println("9. Exit");
+            System.out.println("9. Find Duplicates");
+            System.out.println("10. Exit");
             System.out.print("Enter your choice: ");
 
             String choice = scanner.nextLine().trim();
@@ -77,11 +81,14 @@ public class Main {
                     applyDiscountToOrder();
                     break;
                 case "9":
+                    findDuplicates();
+                    break;
+                case "10":
                     running = false;
                     System.out.println("Thank you for using ShopFlow!");
                     break;
                 default:
-                    System.out.println("Invalid choice. Please select 1-9.");
+                    System.out.println("Invalid choice. Please select 1-10.");
             }
         }
 
@@ -113,15 +120,27 @@ public class Main {
     private static void addProduct() {
         System.out.println("\n========== ADD PRODUCT ==========");
 
-        String code = readNonEmpty("Enter numeric product code: ");
+        String code = readNonEmpty("Enter product code: ");
 
-        if (!code.matches("\\d+")) {
-            System.out.println("Product code must contain digits only.");
+        if (!code.matches("[A-Za-z0-9-]+")) {
+            System.out.println(
+                    "Product code can contain letters, digits, and hyphens only."
+            );
             return;
         }
 
-        if (findProduct(code) != null) {
-            System.out.println("Product code already exists.");
+        // Product codes are unique, case-insensitive business identifiers.
+        // Product.equals() compares codes, so contains() rejects duplicates.
+        Product candidate = new Product(
+                code, "Temporary", "Temporary",
+                new BigDecimal("1.00"), 0
+        );
+
+        if (products.contains(candidate)) {
+            System.out.println(
+                    "Product rejected: code '" + code
+                            + "' already exists. Product codes are case-insensitive."
+            );
             return;
         }
 
@@ -166,9 +185,20 @@ public class Main {
         String email = readNonEmpty("Enter email: ");
         String phone = readNonEmpty("Enter phone: ");
 
-        int id = customers.size() + 1;
+        int id = customers.stream()
+                .mapToInt(Customer::getId)
+                .max()
+                .orElse(0) + 1;
 
         Customer customer = new Customer(id, name, email, phone);
+
+        if (customers.contains(customer)) {
+            System.out.println(
+                    "Customer rejected: customer ID already exists."
+            );
+            return;
+        }
+
         customers.add(customer);
 
         System.out.println("\nCustomer registered successfully!");
@@ -280,7 +310,11 @@ public class Main {
             }
         }
 
-        int orderId = orders.size() + 1;
+        int orderId = orders.stream()
+                .mapToInt(Order::getId)
+                .max()
+                .orElse(0) + 1;
+
         Order order = new Order(orderId, customer);
 
         for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
@@ -489,6 +523,55 @@ public class Main {
 
         } catch (IllegalArgumentException e) {
             System.out.println("Could not apply discount: " + e.getMessage());
+        }
+    }
+
+    private static void findDuplicates() {
+        System.out.println("\n========== FIND DUPLICATES ==========");
+
+        Set<Product> seenProducts = new HashSet<>();
+        Set<Product> duplicateProducts = new LinkedHashSet<>();
+
+        for (Product product : products) {
+            if (!seenProducts.add(product)) {
+                duplicateProducts.add(product);
+            }
+        }
+
+        Set<Customer> seenCustomers = new HashSet<>();
+        Set<Customer> duplicateCustomers = new LinkedHashSet<>();
+
+        for (Customer customer : customers) {
+            if (!seenCustomers.add(customer)) {
+                duplicateCustomers.add(customer);
+            }
+        }
+
+        if (duplicateProducts.isEmpty() && duplicateCustomers.isEmpty()) {
+            System.out.println("No duplicate products or customers found.");
+            return;
+        }
+
+        if (!duplicateProducts.isEmpty()) {
+            System.out.println("\nDuplicate Products:");
+
+            for (Product product : duplicateProducts) {
+                System.out.println(
+                        "Code: " + product.getCode()
+                                + " | Name: " + product.getName()
+                );
+            }
+        }
+
+        if (!duplicateCustomers.isEmpty()) {
+            System.out.println("\nDuplicate Customers:");
+
+            for (Customer customer : duplicateCustomers) {
+                System.out.println(
+                        "ID: " + customer.getId()
+                                + " | Name: " + customer.getName()
+                );
+            }
         }
     }
 
