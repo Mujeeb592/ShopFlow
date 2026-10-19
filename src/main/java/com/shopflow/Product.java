@@ -3,19 +3,24 @@ package com.shopflow;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 public class Product {
 
-    private String code;
-    private String name;
-    private String category;
-    private BigDecimal price;
+    private final String code;
+    private final String name;
+    private final String category;
+    private final BigDecimal price;
     private int quantity;
 
     public Product(String code, String name, String category,
                    BigDecimal price, int quantity) {
 
-        this.code = code;
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Product code cannot be empty.");
+        }
+
+        this.code = code.trim();
         this.name = name;
         this.category = category;
         this.price = price.setScale(2, RoundingMode.HALF_UP);
@@ -43,15 +48,11 @@ public class Product {
     }
 
     public boolean reduceStock(int quantityToReduce) {
-        if (quantityToReduce <= 0) {
+        if (quantityToReduce <= 0 || quantityToReduce > quantity) {
             return false;
         }
 
-        if (quantityToReduce > this.quantity) {
-            return false;
-        }
-
-        this.quantity -= quantityToReduce;
+        quantity -= quantityToReduce;
         return true;
     }
 
@@ -63,12 +64,35 @@ public class Product {
     public void displayProduct() {
         System.out.printf(
                 "%-10s %-20s %-20s %10s %10d%n",
-                code,
-                name,
-                category,
-                price.toPlainString(),
-                quantity
+                code, name, category, price.toPlainString(), quantity
         );
+    }
+
+    /*
+     * BUSINESS RULE:
+     * Two products are the same if their product codes match,
+     * ignoring letter case. For example, KB-100 and kb-100
+     * represent the same product, regardless of price or stock.
+     */
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+
+        if (!(obj instanceof Product)) {
+            return false;
+        }
+
+        Product other = (Product) obj;
+
+        return code.equalsIgnoreCase(other.code);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(code.toUpperCase(java.util.Locale.ROOT));
     }
 
     @Override

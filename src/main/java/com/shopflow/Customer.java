@@ -1,6 +1,8 @@
 
 package com.shopflow;
 
+import java.util.Objects;
+
 public class Customer {
 
     private final int id;
@@ -43,6 +45,31 @@ public class Customer {
 
     public String getPhone() {
         return phone;
+    }
+
+    /*
+     * BUSINESS RULE:
+     * Two customer objects represent the same customer
+     * if their unique customer IDs match.
+     */
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+
+        if (!(obj instanceof Customer)) {
+            return false;
+        }
+
+        Customer other = (Customer) obj;
+        return id == other.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 
     @Override
