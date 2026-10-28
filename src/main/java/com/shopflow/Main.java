@@ -4,13 +4,15 @@ package com.shopflow;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.Scanner;
+import java.util.Set;
 
 public class Main {
 
@@ -22,6 +24,10 @@ public class Main {
     private static final List<Product> products = new ArrayList<>();
     private static final List<Customer> customers = new ArrayList<>();
     private static final List<Order> orders = new ArrayList<>();
+
+    // HashMap provides average O(1) product-code lookup.
+    // Keys are normalized to make lookups case-insensitive.
+    private static final Map<String, Product> productsByCode = new HashMap<>();
 
     public static void main(String[] args) {
 
@@ -37,6 +43,8 @@ public class Main {
                 "103", "Monitor", "Electronics",
                 new BigDecimal("25000.00"), 5));
 
+        rebuildProductIndex();
+
         boolean running = true;
 
         while (running) {
@@ -50,7 +58,12 @@ public class Main {
             System.out.println("7. Change Order Status");
             System.out.println("8. Apply Discount to Order");
             System.out.println("9. Find Duplicates");
-            System.out.println("10. Exit");
+            System.out.println("10. Search Products by Name");
+            System.out.println("11. Filter Products by Category");
+            System.out.println("12. Filter Products by Price Range");
+            System.out.println("13. Show Low-Stock Products");
+            System.out.println("14. Find Orders by Customer");
+            System.out.println("15. Exit");
             System.out.print("Enter your choice: ");
 
             String choice = scanner.nextLine().trim();
@@ -84,16 +97,55 @@ public class Main {
                     findDuplicates();
                     break;
                 case "10":
+                    searchProductsByName();
+                    break;
+                case "11":
+                    filterProductsByCategory();
+                    break;
+                case "12":
+                    filterProductsByPriceRange();
+                    break;
+                case "13":
+                    showLowStockProducts();
+                    break;
+                case "14":
+                    findOrdersByCustomer();
+                    break;
+                case "15":
                     running = false;
                     System.out.println("Thank you for using ShopFlow!");
                     break;
                 default:
-                    System.out.println("Invalid choice. Please select 1-10.");
+                    System.out.println("Invalid choice. Please select 1-15.");
             }
         }
 
         scanner.close();
     }
+
+    // ---------------- PRODUCT INDEX ----------------
+
+    private static String normalizeCode(String code) {
+        return code.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static void rebuildProductIndex() {
+        productsByCode.clear();
+
+        for (Product product : products) {
+            productsByCode.put(normalizeCode(product.getCode()), product);
+        }
+    }
+
+    private static Product findProduct(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+
+        return productsByCode.get(normalizeCode(code));
+    }
+
+    // ---------------- VIEW PRODUCTS ----------------
 
     private static void viewProducts() {
         if (products.isEmpty()) {
@@ -102,8 +154,7 @@ public class Main {
         }
 
         System.out.println("\n---------------- PRODUCT LIST ----------------");
-        System.out.printf("%-10s %-20s %-20s %10s %10s%n",
-                "Code", "Name", "Category", "Price", "Stock");
+        printProductHeader();
 
         BigDecimal stockValue = ZERO_MONEY;
 
@@ -117,6 +168,32 @@ public class Main {
         System.out.println("Total stock value: Rs. " + formatMoney(stockValue));
     }
 
+    private static void printProductHeader() {
+        System.out.printf("%-10s %-20s %-20s %10s %10s%n",
+                "Code", "Name", "Category", "Price", "Stock");
+    }
+
+    private static void displayProductResults(
+            List<Product> results, String emptyMessage) {
+
+        if (results.isEmpty()) {
+            System.out.println(emptyMessage);
+            return;
+        }
+
+        System.out.println("\n---------------- SEARCH RESULTS ----------------");
+        printProductHeader();
+
+        for (Product product : results) {
+            product.displayProduct();
+        }
+
+        System.out.println("-----------------------------------------------");
+        System.out.println("Results found: " + results.size());
+    }
+
+    // ---------------- ADD PRODUCT ----------------
+
     private static void addProduct() {
         System.out.println("\n========== ADD PRODUCT ==========");
 
@@ -129,14 +206,7 @@ public class Main {
             return;
         }
 
-        // Product codes are unique, case-insensitive business identifiers.
-        // Product.equals() compares codes, so contains() rejects duplicates.
-        Product candidate = new Product(
-                code, "Temporary", "Temporary",
-                new BigDecimal("1.00"), 0
-        );
-
-        if (products.contains(candidate)) {
+        if (findProduct(code) != null) {
             System.out.println(
                     "Product rejected: code '" + code
                             + "' already exists. Product codes are case-insensitive."
@@ -161,9 +231,21 @@ public class Main {
             return;
         }
 
-        products.add(new Product(code, name, category, price, quantity));
-        System.out.println("Product added successfully.");
+        try {
+            Product product = new Product(
+                    code, name, category, price, quantity
+            );
+
+            products.add(product);
+            productsByCode.put(normalizeCode(product.getCode()), product);
+
+            System.out.println("Product added successfully.");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Product could not be added: " + e.getMessage());
+        }
     }
+
+    // ---------------- SEARCH PRODUCT BY CODE ----------------
 
     private static void searchProduct() {
         String code = readNonEmpty("Enter product code to search: ");
@@ -172,11 +254,120 @@ public class Main {
         if (product == null) {
             System.out.println("Product not found.");
         } else {
-            System.out.printf("%-10s %-20s %-20s %10s %10s%n",
-                    "Code", "Name", "Category", "Price", "Stock");
+            printProductHeader();
             product.displayProduct();
         }
     }
+
+    // ---------------- SEARCH BY PARTIAL NAME ----------------
+
+    private static void searchProductsByName() {
+        System.out.println("\n========== SEARCH PRODUCTS BY NAME ==========");
+
+        String searchText = readNonEmpty(
+                "Enter all or part of the product name: "
+        ).toLowerCase(Locale.ROOT);
+
+        List<Product> results = new ArrayList<>();
+
+        for (Product product : products) {
+            if (product.getName().toLowerCase(Locale.ROOT)
+                    .contains(searchText)) {
+                results.add(product);
+            }
+        }
+
+        displayProductResults(results, "No products matched that name.");
+    }
+
+    // ---------------- FILTER BY CATEGORY ----------------
+
+    private static void filterProductsByCategory() {
+        System.out.println("\n========== FILTER BY CATEGORY ==========");
+
+        String category = readNonEmpty(
+                "Enter category: "
+        ).toLowerCase(Locale.ROOT);
+
+        List<Product> results = new ArrayList<>();
+
+        for (Product product : products) {
+            if (product.getCategory().equalsIgnoreCase(category)) {
+                results.add(product);
+            }
+        }
+
+        displayProductResults(results, "No products found in that category.");
+    }
+
+    // ---------------- FILTER BY PRICE RANGE ----------------
+
+    private static void filterProductsByPriceRange() {
+        System.out.println("\n========== FILTER BY PRICE RANGE ==========");
+
+        BigDecimal minimumPrice = readNonNegativePrice(
+                "Enter minimum price: "
+        );
+
+        if (minimumPrice == null) {
+            System.out.println("Invalid minimum price.");
+            return;
+        }
+
+        BigDecimal maximumPrice = readNonNegativePrice(
+                "Enter maximum price: "
+        );
+
+        if (maximumPrice == null) {
+            System.out.println("Invalid maximum price.");
+            return;
+        }
+
+        if (minimumPrice.compareTo(maximumPrice) > 0) {
+            System.out.println(
+                    "Minimum price cannot be greater than maximum price."
+            );
+            return;
+        }
+
+        List<Product> results = new ArrayList<>();
+
+        for (Product product : products) {
+            boolean aboveMinimum =
+                    product.getPrice().compareTo(minimumPrice) >= 0;
+
+            boolean belowMaximum =
+                    product.getPrice().compareTo(maximumPrice) <= 0;
+
+            if (aboveMinimum && belowMaximum) {
+                results.add(product);
+            }
+        }
+
+        displayProductResults(
+                results,
+                "No products found within that price range."
+        );
+    }
+
+    // ---------------- LOW STOCK ----------------
+
+    private static void showLowStockProducts() {
+        System.out.println("\n========== LOW-STOCK PRODUCTS ==========");
+        System.out.println("Low stock means quantity is below 5.");
+
+        List<Product> results = new ArrayList<>();
+
+        for (Product product : products) {
+            if (product.getQuantity() < 5) {
+                results.add(product);
+            }
+        }
+
+        displayProductResults(results, "No low-stock products found.");
+    }
+
+    // ---------------- REGISTER CUSTOMER ----------------
 
     private static void registerCustomer() {
         System.out.println("\n========== REGISTER CUSTOMER ==========");
@@ -190,20 +381,27 @@ public class Main {
                 .max()
                 .orElse(0) + 1;
 
-        Customer customer = new Customer(id, name, email, phone);
+        try {
+            Customer customer = new Customer(id, name, email, phone);
 
-        if (customers.contains(customer)) {
-            System.out.println(
-                    "Customer rejected: customer ID already exists."
-            );
-            return;
+            if (customers.contains(customer)) {
+                System.out.println(
+                        "Customer rejected: customer ID already exists."
+                );
+                return;
+            }
+
+            customers.add(customer);
+
+            System.out.println("\nCustomer registered successfully!");
+            System.out.println(customer);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Customer could not be registered: "
+                    + e.getMessage());
         }
-
-        customers.add(customer);
-
-        System.out.println("\nCustomer registered successfully!");
-        System.out.println(customer);
     }
+
+    // ---------------- PLACE ORDER ----------------
 
     private static void placeOrder() {
         System.out.println("\n========== PLACE ORDER ==========");
@@ -338,6 +536,8 @@ public class Main {
         order.printReceipt();
     }
 
+    // ---------------- VIEW ORDER / RECEIPT ----------------
+
     private static void viewOrder() {
         if (orders.isEmpty()) {
             System.out.println("No orders found.");
@@ -371,6 +571,70 @@ public class Main {
         }
     }
 
+    // ---------------- FIND ORDERS BY CUSTOMER ----------------
+
+    private static void findOrdersByCustomer() {
+        System.out.println("\n========== FIND ORDERS BY CUSTOMER ==========");
+
+        if (customers.isEmpty()) {
+            System.out.println("No customers registered.");
+            return;
+        }
+
+        for (Customer customer : customers) {
+            System.out.println(
+                    "Customer ID: " + customer.getId()
+                            + " | Name: " + customer.getName()
+            );
+        }
+
+        int customerId = readPositiveInt("Enter customer ID: ");
+
+        if (customerId <= 0) {
+            System.out.println("Invalid customer ID.");
+            return;
+        }
+
+        Customer customer = findCustomer(customerId);
+
+        if (customer == null) {
+            System.out.println("Customer not found.");
+            return;
+        }
+
+        List<Order> customerOrders = new ArrayList<>();
+
+        for (Order order : orders) {
+            if (order.getCustomer().getId() == customerId) {
+                customerOrders.add(order);
+            }
+        }
+
+        if (customerOrders.isEmpty()) {
+            System.out.println(
+                    "No orders found for customer: " + customer.getName()
+            );
+            return;
+        }
+
+        System.out.println("\nOrders for " + customer.getName() + ":");
+
+        for (Order order : customerOrders) {
+            System.out.println(
+                    "Order ID: " + order.getId()
+                            + " | Date: " + order.getDate()
+                            + " | Total: Rs. " + formatMoney(order.getTotal())
+                            + " | Final Total: Rs. "
+                            + formatMoney(order.getFinalTotal())
+                            + " | Status: " + order.getStatus()
+            );
+        }
+
+        System.out.println("Total orders found: " + customerOrders.size());
+    }
+
+    // ---------------- CHANGE ORDER STATUS ----------------
+
     private static void changeOrderStatus() {
         if (orders.isEmpty()) {
             System.out.println("No orders available to update.");
@@ -402,7 +666,7 @@ public class Main {
         System.out.println("Current status: " + order.getStatus());
         System.out.println("Available statuses:");
 
-        for (OrderStatus status : OrderStatus.values()) {
+        for (OrderStatus status : order.getStatus().getAllowedNextStatuses()) {
             System.out.println("- " + status);
         }
 
@@ -412,7 +676,7 @@ public class Main {
         OrderStatus newStatus;
 
         try {
-            newStatus = OrderStatus.valueOf(input.toUpperCase());
+            newStatus = OrderStatus.valueOf(input.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             System.out.println(
                     "Invalid status. Please enter one of the listed statuses."
@@ -430,6 +694,8 @@ public class Main {
             System.out.println("Status change refused: " + e.getMessage());
         }
     }
+
+    // ---------------- APPLY DISCOUNT ----------------
 
     private static void applyDiscountToOrder() {
         if (orders.isEmpty()) {
@@ -526,6 +792,8 @@ public class Main {
         }
     }
 
+    // ---------------- FIND DUPLICATES ----------------
+
     private static void findDuplicates() {
         System.out.println("\n========== FIND DUPLICATES ==========");
 
@@ -575,14 +843,7 @@ public class Main {
         }
     }
 
-    private static Product findProduct(String code) {
-        for (Product product : products) {
-            if (product.getCode().equalsIgnoreCase(code)) {
-                return product;
-            }
-        }
-        return null;
-    }
+    // ---------------- FIND CUSTOMER / ORDER ----------------
 
     private static Customer findCustomer(int id) {
         for (Customer customer : customers) {
@@ -590,6 +851,7 @@ public class Main {
                 return customer;
             }
         }
+
         return null;
     }
 
@@ -599,8 +861,11 @@ public class Main {
                 return order;
             }
         }
+
         return null;
     }
+
+    // ---------------- INPUT HELPERS ----------------
 
     private static String readNonEmpty(String prompt) {
         while (true) {
@@ -647,7 +912,23 @@ public class Main {
                 return null;
             }
 
-            return value;
+            return value.setScale(2, ROUNDING_RULE);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static BigDecimal readNonNegativePrice(String prompt) {
+        System.out.print(prompt);
+
+        try {
+            BigDecimal value = new BigDecimal(scanner.nextLine().trim());
+
+            if (value.compareTo(BigDecimal.ZERO) < 0) {
+                return null;
+            }
+
+            return value.setScale(2, ROUNDING_RULE);
         } catch (NumberFormatException e) {
             return null;
         }
