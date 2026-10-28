@@ -1,0 +1,1684 @@
+
+========== BuyThreeGetOneFreeDiscount.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public class BuyThreeGetOneFreeDiscount implements Discount {
+
+    @Override
+    public String getName() {
+        return "Buy 3 Get 1 Free";
+    }
+
+    @Override
+    public BigDecimal calculateDiscount(Order order) {
+        if (order == null) {
+            throw new IllegalArgumentException(
+                    "Order cannot be null."
+            );
+        }
+
+        List<BigDecimal> unitPrices = new ArrayList<>();
+
+        for (OrderItem item : order.getItems()) {
+            for (int i = 0; i < item.getQuantity(); i++) {
+                unitPrices.add(item.getPriceAtPurchase());
+            }
+        }
+
+        if (unitPrices.size() < 4) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+
+        unitPrices.sort(Collections.reverseOrder());
+
+        BigDecimal discount = BigDecimal.ZERO.setScale(2);
+
+        for (int i = 3; i < unitPrices.size(); i += 4) {
+            discount = discount.add(unitPrices.get(i));
+        }
+
+        return discount.min(order.getTotal())
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+}
+
+========== Customer.java ==========
+
+package com.shopflow;
+
+import java.util.Objects;
+
+public class Customer {
+
+    private final int id;
+    private final String name;
+    private final String email;
+    private final String phone;
+
+    public Customer(int id, String name, String email, String phone) {
+        if (id <= 0) {
+            throw new IllegalArgumentException(
+                    "Customer ID must be positive."
+            );
+        }
+
+        if (name == null || name.isBlank()
+                || email == null || email.isBlank()
+                || phone == null || phone.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Customer details cannot be empty."
+            );
+        }
+
+        this.id = id;
+        this.name = name.trim();
+        this.email = email.trim();
+        this.phone = phone.trim();
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    /*
+     * BUSINESS RULE:
+     * Two customer objects represent the same customer
+     * if their unique customer IDs match.
+     */
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+
+        if (!(obj instanceof Customer)) {
+            return false;
+        }
+
+        Customer other = (Customer) obj;
+        return id == other.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "Customer ID: " + id
+                + "\nName: " + name
+                + "\nEmail: " + email
+                + "\nPhone: " + phone;
+    }
+}
+
+========== CustomerEqualityTest.java ==========
+
+package com.shopflow;
+
+import java.util.HashSet;
+import java.util.Set;
+
+public class CustomerEqualityTest {
+
+    public static void main(String[] args) {
+
+        Customer first = new Customer(
+                1, "Mujeeb", "mujeeb@example.com", "03001234567"
+        );
+
+        Customer second = new Customer(
+                1, "Another Name", "another@example.com", "03111234567"
+        );
+
+        System.out.println("Are customers equal? " + first.equals(second));
+
+        Set<Customer> customerSet = new HashSet<>();
+        customerSet.add(first);
+        customerSet.add(second);
+
+        System.out.println("HashSet size: " + customerSet.size());
+    }
+}
+
+========== Discount.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+
+public interface Discount {
+
+    String getName();
+
+    BigDecimal calculateDiscount(Order order);
+}
+
+========== DuplicateDetectionTest.java ==========
+
+package com.shopflow;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.util.List;
+
+public class DuplicateDetectionTest {
+
+    public static void main(String[] args) throws Exception {
+
+        // Access the products list from Main.
+        Field productsField = Main.class.getDeclaredField("products");
+        productsField.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<Product> products =
+                (List<Product>) productsField.get(null);
+
+        // Access the duplicate detection method from Main.
+        Method findDuplicatesMethod =
+                Main.class.getDeclaredMethod("findDuplicates");
+        findDuplicatesMethod.setAccessible(true);
+
+        // Create two products with the same code but different letter cases.
+        Product firstProduct = new Product(
+                "KB-100",
+                "Keyboard",
+                "Electronics",
+                new BigDecimal("200.00"),
+                10
+        );
+
+        Product duplicateProduct = new Product(
+                "kb-100",
+                "Wireless Keyboard",
+                "Accessories",
+                new BigDecimal("250.00"),
+                5
+        );
+
+        try {
+            // Add both products temporarily to test duplicate detection.
+            products.add(firstProduct);
+            products.add(duplicateProduct);
+
+            System.out.println("========== DUPLICATE DETECTION TEST ==========");
+            System.out.println("First product code: KB-100");
+            System.out.println("Second product code: kb-100");
+            System.out.println("Expected result: Duplicate product is reported.");
+
+            // Run the existing duplicate detection method.
+            findDuplicatesMethod.invoke(null);
+
+        } finally {
+            // Remove test products so the inventory stays unchanged.
+            products.remove(firstProduct);
+            products.remove(duplicateProduct);
+
+            System.out.println("\nTemporary test products removed.");
+        }
+    }
+}
+
+========== FlatDiscount.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+public class FlatDiscount implements Discount {
+
+    private final BigDecimal amount;
+
+    public FlatDiscount(BigDecimal amount) {
+        if (amount == null
+                || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(
+                    "Discount amount must be greater than zero."
+            );
+        }
+
+        this.amount = amount.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    @Override
+    public String getName() {
+        return "Flat Discount (Rs. " + amount.toPlainString() + ")";
+    }
+
+    @Override
+    public BigDecimal calculateDiscount(Order order) {
+        if (order == null) {
+            throw new IllegalArgumentException(
+                    "Order cannot be null."
+            );
+        }
+
+        return amount.min(order.getTotal())
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+}
+
+========== Main.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Scanner;
+
+public class Main {
+
+    private static final Scanner scanner = new Scanner(System.in);
+
+    private static final BigDecimal ZERO_MONEY = new BigDecimal("0.00");
+    private static final RoundingMode ROUNDING_RULE = RoundingMode.HALF_UP;
+
+    private static final List<Product> products = new ArrayList<>();
+    private static final List<Customer> customers = new ArrayList<>();
+    private static final List<Order> orders = new ArrayList<>();
+
+    public static void main(String[] args) {
+
+        products.add(new Product(
+                "101", "Keyboard", "Accessories",
+                new BigDecimal("1500.00"), 10));
+
+        products.add(new Product(
+                "102", "Mouse", "Accessories",
+                new BigDecimal("800.00"), 15));
+
+        products.add(new Product(
+                "103", "Monitor", "Electronics",
+                new BigDecimal("25000.00"), 5));
+
+        boolean running = true;
+
+        while (running) {
+            System.out.println("\n========== SHOPFLOW MENU ==========");
+            System.out.println("1. View Products");
+            System.out.println("2. Add Product");
+            System.out.println("3. Search Product by Code");
+            System.out.println("4. Register Customer");
+            System.out.println("5. Place Order");
+            System.out.println("6. View Order / Receipt");
+            System.out.println("7. Change Order Status");
+            System.out.println("8. Apply Discount to Order");
+            System.out.println("9. Find Duplicates");
+            System.out.println("10. Exit");
+            System.out.print("Enter your choice: ");
+
+            String choice = scanner.nextLine().trim();
+
+            switch (choice) {
+                case "1":
+                    viewProducts();
+                    break;
+                case "2":
+                    addProduct();
+                    break;
+                case "3":
+                    searchProduct();
+                    break;
+                case "4":
+                    registerCustomer();
+                    break;
+                case "5":
+                    placeOrder();
+                    break;
+                case "6":
+                    viewOrder();
+                    break;
+                case "7":
+                    changeOrderStatus();
+                    break;
+                case "8":
+                    applyDiscountToOrder();
+                    break;
+                case "9":
+                    findDuplicates();
+                    break;
+                case "10":
+                    running = false;
+                    System.out.println("Thank you for using ShopFlow!");
+                    break;
+                default:
+                    System.out.println("Invalid choice. Please select 1-10.");
+            }
+        }
+
+        scanner.close();
+    }
+
+    private static void viewProducts() {
+        if (products.isEmpty()) {
+            System.out.println("No products available.");
+            return;
+        }
+
+        System.out.println("\n---------------- PRODUCT LIST ----------------");
+        System.out.printf("%-10s %-20s %-20s %10s %10s%n",
+                "Code", "Name", "Category", "Price", "Stock");
+
+        BigDecimal stockValue = ZERO_MONEY;
+
+        for (Product product : products) {
+            product.displayProduct();
+            stockValue = stockValue.add(product.getStockValue());
+        }
+
+        System.out.println("----------------------------------------------");
+        System.out.println("Total products: " + products.size());
+        System.out.println("Total stock value: Rs. " + formatMoney(stockValue));
+    }
+
+    private static void addProduct() {
+        System.out.println("\n========== ADD PRODUCT ==========");
+
+        String code = readNonEmpty("Enter product code: ");
+
+        if (!code.matches("[A-Za-z0-9-]+")) {
+            System.out.println(
+                    "Product code can contain letters, digits, and hyphens only."
+            );
+            return;
+        }
+
+        // Product codes are unique, case-insensitive business identifiers.
+        // Product.equals() compares codes, so contains() rejects duplicates.
+        Product candidate = new Product(
+                code, "Temporary", "Temporary",
+                new BigDecimal("1.00"), 0
+        );
+
+        if (products.contains(candidate)) {
+            System.out.println(
+                    "Product rejected: code '" + code
+                            + "' already exists. Product codes are case-insensitive."
+            );
+            return;
+        }
+
+        String name = readNonEmpty("Enter product name: ");
+        String category = readNonEmpty("Enter category: ");
+
+        BigDecimal price = readPositivePrice("Enter price: ");
+
+        if (price == null) {
+            System.out.println("Enter a valid price greater than zero.");
+            return;
+        }
+
+        int quantity = readNonNegativeInt("Enter opening stock: ");
+
+        if (quantity < 0) {
+            System.out.println("Stock cannot be negative.");
+            return;
+        }
+
+        products.add(new Product(code, name, category, price, quantity));
+        System.out.println("Product added successfully.");
+    }
+
+    private static void searchProduct() {
+        String code = readNonEmpty("Enter product code to search: ");
+        Product product = findProduct(code);
+
+        if (product == null) {
+            System.out.println("Product not found.");
+        } else {
+            System.out.printf("%-10s %-20s %-20s %10s %10s%n",
+                    "Code", "Name", "Category", "Price", "Stock");
+            product.displayProduct();
+        }
+    }
+
+    private static void registerCustomer() {
+        System.out.println("\n========== REGISTER CUSTOMER ==========");
+
+        String name = readNonEmpty("Enter customer name: ");
+        String email = readNonEmpty("Enter email: ");
+        String phone = readNonEmpty("Enter phone: ");
+
+        int id = customers.stream()
+                .mapToInt(Customer::getId)
+                .max()
+                .orElse(0) + 1;
+
+        Customer customer = new Customer(id, name, email, phone);
+
+        if (customers.contains(customer)) {
+            System.out.println(
+                    "Customer rejected: customer ID already exists."
+            );
+            return;
+        }
+
+        customers.add(customer);
+
+        System.out.println("\nCustomer registered successfully!");
+        System.out.println(customer);
+    }
+
+    private static void placeOrder() {
+        System.out.println("\n========== PLACE ORDER ==========");
+
+        if (customers.isEmpty()) {
+            System.out.println(
+                    "No customers registered. Register a customer first."
+            );
+            return;
+        }
+
+        if (products.isEmpty()) {
+            System.out.println("No products available to order.");
+            return;
+        }
+
+        System.out.println("\nRegistered Customers:");
+
+        for (Customer customer : customers) {
+            System.out.println(customer.getId() + ". "
+                    + customer.getName() + " (" + customer.getEmail() + ")");
+        }
+
+        int customerId = readPositiveInt("Enter customer ID: ");
+
+        if (customerId <= 0) {
+            System.out.println("Invalid customer ID.");
+            return;
+        }
+
+        Customer customer = findCustomer(customerId);
+
+        if (customer == null) {
+            System.out.println("Customer not found. Order cancelled.");
+            return;
+        }
+
+        viewProducts();
+
+        System.out.println("\nEnter product codes and quantities.");
+        System.out.println("Type DONE as the product code to finish.");
+
+        Map<Product, Integer> requestedItems = new LinkedHashMap<>();
+
+        while (true) {
+            System.out.print("\nProduct code (or DONE): ");
+            String code = scanner.nextLine().trim();
+
+            if (code.equalsIgnoreCase("DONE")) {
+                break;
+            }
+
+            Product product = findProduct(code);
+
+            if (product == null) {
+                System.out.println("Product not found. Try again.");
+                continue;
+            }
+
+            System.out.print("Enter quantity: ");
+            String quantityInput = scanner.nextLine().trim();
+
+            int quantity;
+
+            try {
+                quantity = Integer.parseInt(quantityInput);
+            } catch (NumberFormatException e) {
+                System.out.println("Quantity must be a whole number.");
+                continue;
+            }
+
+            if (quantity <= 0) {
+                System.out.println("Quantity must be greater than zero.");
+                continue;
+            }
+
+            int previousQuantity = requestedItems.getOrDefault(product, 0);
+
+            if (quantity > product.getQuantity() - previousQuantity) {
+                System.out.println(
+                        "Insufficient stock. Available stock: "
+                                + product.getQuantity()
+                                + ", already requested: " + previousQuantity
+                );
+                continue;
+            }
+
+            requestedItems.put(product, previousQuantity + quantity);
+            System.out.println("Item added to order.");
+        }
+
+        if (requestedItems.isEmpty()) {
+            System.out.println("No items selected. Order cancelled.");
+            return;
+        }
+
+        for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
+            if (entry.getValue() > entry.getKey().getQuantity()) {
+                System.out.println(
+                        "Order refused: insufficient stock for "
+                                + entry.getKey().getName()
+                );
+                return;
+            }
+        }
+
+        int orderId = orders.stream()
+                .mapToInt(Order::getId)
+                .max()
+                .orElse(0) + 1;
+
+        Order order = new Order(orderId, customer);
+
+        for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
+            order.addItem(new OrderItem(entry.getKey(), entry.getValue()));
+        }
+
+        for (Map.Entry<Product, Integer> entry : requestedItems.entrySet()) {
+            boolean reduced = entry.getKey().reduceStock(entry.getValue());
+
+            if (!reduced) {
+                System.out.println(
+                        "Stock update failed. Please review inventory."
+                );
+                return;
+            }
+        }
+
+        orders.add(order);
+
+        System.out.println("\nOrder placed successfully!");
+        order.printReceipt();
+    }
+
+    private static void viewOrder() {
+        if (orders.isEmpty()) {
+            System.out.println("No orders found.");
+            return;
+        }
+
+        System.out.println("\n========== EXISTING ORDERS ==========");
+
+        for (Order order : orders) {
+            System.out.println("Order ID: " + order.getId()
+                    + " | Customer: " + order.getCustomer().getName()
+                    + " | Date: " + order.getDate()
+                    + " | Subtotal: Rs. " + formatMoney(order.getTotal())
+                    + " | Final Total: Rs. " + formatMoney(order.getFinalTotal())
+                    + " | Status: " + order.getStatus());
+        }
+
+        int orderId = readPositiveInt("Enter order ID to view receipt: ");
+
+        if (orderId <= 0) {
+            System.out.println("Invalid order ID.");
+            return;
+        }
+
+        Order order = findOrder(orderId);
+
+        if (order == null) {
+            System.out.println("Order not found.");
+        } else {
+            order.printReceipt();
+        }
+    }
+
+    private static void changeOrderStatus() {
+        if (orders.isEmpty()) {
+            System.out.println("No orders available to update.");
+            return;
+        }
+
+        System.out.println("\n========== CHANGE ORDER STATUS ==========");
+
+        for (Order order : orders) {
+            System.out.println("Order ID: " + order.getId()
+                    + " | Customer: " + order.getCustomer().getName()
+                    + " | Current Status: " + order.getStatus());
+        }
+
+        int orderId = readPositiveInt("Enter order ID: ");
+
+        if (orderId <= 0) {
+            System.out.println("Invalid order ID.");
+            return;
+        }
+
+        Order order = findOrder(orderId);
+
+        if (order == null) {
+            System.out.println("Order not found.");
+            return;
+        }
+
+        System.out.println("Current status: " + order.getStatus());
+        System.out.println("Available statuses:");
+
+        for (OrderStatus status : OrderStatus.values()) {
+            System.out.println("- " + status);
+        }
+
+        System.out.print("Enter new status: ");
+        String input = scanner.nextLine().trim();
+
+        OrderStatus newStatus;
+
+        try {
+            newStatus = OrderStatus.valueOf(input.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            System.out.println(
+                    "Invalid status. Please enter one of the listed statuses."
+            );
+            return;
+        }
+
+        try {
+            order.changeStatus(newStatus);
+            System.out.println(
+                    "Order status updated successfully to "
+                            + order.getStatus() + "."
+            );
+        } catch (IllegalStateException e) {
+            System.out.println("Status change refused: " + e.getMessage());
+        }
+    }
+
+    private static void applyDiscountToOrder() {
+        if (orders.isEmpty()) {
+            System.out.println("No orders available to apply a discount.");
+            return;
+        }
+
+        System.out.println("\n========== APPLY DISCOUNT ==========");
+
+        for (Order order : orders) {
+            System.out.println("Order ID: " + order.getId()
+                    + " | Customer: " + order.getCustomer().getName()
+                    + " | Subtotal: Rs. " + formatMoney(order.getTotal())
+                    + " | Current Discount: "
+                    + (order.getAppliedDiscount() == null
+                    ? "None" : order.getAppliedDiscount().getName()));
+        }
+
+        int orderId = readPositiveInt("Enter order ID: ");
+
+        if (orderId <= 0) {
+            System.out.println("Invalid order ID.");
+            return;
+        }
+
+        Order order = findOrder(orderId);
+
+        if (order == null) {
+            System.out.println("Order not found.");
+            return;
+        }
+
+        System.out.println("\nSelect discount type:");
+        System.out.println("1. Percentage Discount");
+        System.out.println("2. Flat Amount Discount");
+        System.out.println("3. Buy 3 Get 1 Free");
+        System.out.print("Enter your choice: ");
+
+        String choice = scanner.nextLine().trim();
+
+        Discount discount;
+
+        try {
+            switch (choice) {
+                case "1":
+                    BigDecimal percentage = readPositivePrice(
+                            "Enter percentage (greater than 0, up to 100): "
+                    );
+
+                    if (percentage == null
+                            || percentage.compareTo(BigDecimal.ZERO) <= 0
+                            || percentage.compareTo(new BigDecimal("100")) > 0) {
+                        System.out.println(
+                                "Percentage must be greater than 0 and at most 100."
+                        );
+                        return;
+                    }
+
+                    discount = new PercentageDiscount(percentage);
+                    break;
+
+                case "2":
+                    BigDecimal amount = readPositivePrice(
+                            "Enter flat discount amount in Rs.: "
+                    );
+
+                    if (amount == null
+                            || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                        System.out.println(
+                                "Discount amount must be greater than zero."
+                        );
+                        return;
+                    }
+
+                    discount = new FlatDiscount(amount);
+                    break;
+
+                case "3":
+                    discount = new BuyThreeGetOneFreeDiscount();
+                    break;
+
+                default:
+                    System.out.println("Invalid discount choice.");
+                    return;
+            }
+
+            order.applyDiscount(discount);
+
+            System.out.println("\nDiscount applied successfully!");
+            order.printReceipt();
+
+        } catch (IllegalArgumentException e) {
+            System.out.println("Could not apply discount: " + e.getMessage());
+        }
+    }
+
+    private static void findDuplicates() {
+        System.out.println("\n========== FIND DUPLICATES ==========");
+
+        Set<Product> seenProducts = new HashSet<>();
+        Set<Product> duplicateProducts = new LinkedHashSet<>();
+
+        for (Product product : products) {
+            if (!seenProducts.add(product)) {
+                duplicateProducts.add(product);
+            }
+        }
+
+        Set<Customer> seenCustomers = new HashSet<>();
+        Set<Customer> duplicateCustomers = new LinkedHashSet<>();
+
+        for (Customer customer : customers) {
+            if (!seenCustomers.add(customer)) {
+                duplicateCustomers.add(customer);
+            }
+        }
+
+        if (duplicateProducts.isEmpty() && duplicateCustomers.isEmpty()) {
+            System.out.println("No duplicate products or customers found.");
+            return;
+        }
+
+        if (!duplicateProducts.isEmpty()) {
+            System.out.println("\nDuplicate Products:");
+
+            for (Product product : duplicateProducts) {
+                System.out.println(
+                        "Code: " + product.getCode()
+                                + " | Name: " + product.getName()
+                );
+            }
+        }
+
+        if (!duplicateCustomers.isEmpty()) {
+            System.out.println("\nDuplicate Customers:");
+
+            for (Customer customer : duplicateCustomers) {
+                System.out.println(
+                        "ID: " + customer.getId()
+                                + " | Name: " + customer.getName()
+                );
+            }
+        }
+    }
+
+    private static Product findProduct(String code) {
+        for (Product product : products) {
+            if (product.getCode().equalsIgnoreCase(code)) {
+                return product;
+            }
+        }
+        return null;
+    }
+
+    private static Customer findCustomer(int id) {
+        for (Customer customer : customers) {
+            if (customer.getId() == id) {
+                return customer;
+            }
+        }
+        return null;
+    }
+
+    private static Order findOrder(int id) {
+        for (Order order : orders) {
+            if (order.getId() == id) {
+                return order;
+            }
+        }
+        return null;
+    }
+
+    private static String readNonEmpty(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine().trim();
+
+            if (!input.isEmpty()) {
+                return input;
+            }
+
+            System.out.println("This field cannot be empty.");
+        }
+    }
+
+    private static int readPositiveInt(String prompt) {
+        System.out.print(prompt);
+
+        try {
+            int value = Integer.parseInt(scanner.nextLine().trim());
+            return value > 0 ? value : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private static int readNonNegativeInt(String prompt) {
+        System.out.print(prompt);
+
+        try {
+            int value = Integer.parseInt(scanner.nextLine().trim());
+            return value >= 0 ? value : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private static BigDecimal readPositivePrice(String prompt) {
+        System.out.print(prompt);
+
+        try {
+            BigDecimal value = new BigDecimal(scanner.nextLine().trim());
+
+            if (value.compareTo(BigDecimal.ZERO) <= 0) {
+                return null;
+            }
+
+            return value;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static String formatMoney(BigDecimal amount) {
+        return amount.setScale(2, ROUNDING_RULE).toPlainString();
+    }
+}
+
+========== MoneyHandlingTest.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+public class MoneyHandlingTest {
+
+    public static void main(String[] args) {
+
+        // Demonstration: double has a floating-point precision problem
+        double floatingPointTotal = 0.0;
+
+        for (int i = 0; i < 3; i++) {
+            floatingPointTotal += 0.1;
+        }
+
+        System.out.println("Floating-point problem demonstration");
+        System.out.println("Adding 0.1 three times:");
+        System.out.println("Actual output: " + floatingPointTotal);
+
+        // Test 1: Add Rs. 0.10 ten times using BigDecimal
+        BigDecimal total = new BigDecimal("0.00");
+
+        for (int i = 0; i < 10; i++) {
+            total = total.add(new BigDecimal("0.10"));
+        }
+
+        total = total.setScale(2, RoundingMode.HALF_UP);
+
+        System.out.println("\nTest 1: Add 0.10 ten times");
+        System.out.println("Expected: 1.00");
+        System.out.println("Actual:   " + total.toPlainString());
+        printResult(total.compareTo(new BigDecimal("1.00")) == 0);
+
+        // Test 2: HALF_UP rounding
+        BigDecimal roundedPrice = new BigDecimal("0.465")
+                .setScale(2, RoundingMode.HALF_UP);
+
+        System.out.println("\nTest 2: HALF_UP rounding");
+        System.out.println("Expected: 0.47");
+        System.out.println("Actual:   " + roundedPrice.toPlainString());
+        printResult(roundedPrice.compareTo(new BigDecimal("0.47")) == 0);
+
+        // Test 3: Ten percent discount on Rs. 1199
+        Order percentageOrder = createOrder(
+                1, "1199.00", 1
+        );
+
+        Discount percentageDiscount =
+                new PercentageDiscount(new BigDecimal("10"));
+
+        percentageOrder.applyDiscount(percentageDiscount);
+
+        System.out.println("\nTest 3: Percentage Discount");
+        System.out.println("Subtotal:    Rs. "
+                + percentageOrder.getTotal().toPlainString());
+        System.out.println("Discount:    Rs. "
+                + percentageOrder.getDiscountAmount().toPlainString());
+        System.out.println("Final total: Rs. "
+                + percentageOrder.getFinalTotal().toPlainString());
+
+        printResult(
+                percentageOrder.getTotal()
+                        .compareTo(new BigDecimal("1199.00")) == 0
+                && percentageOrder.getDiscountAmount()
+                        .compareTo(new BigDecimal("119.90")) == 0
+                && percentageOrder.getFinalTotal()
+                        .compareTo(new BigDecimal("1079.10")) == 0
+        );
+
+        // Test 4: Flat discount
+        Order flatOrder = createOrder(
+                2, "1199.00", 1
+        );
+
+        Discount flatDiscount =
+                new FlatDiscount(new BigDecimal("100.00"));
+
+        flatOrder.applyDiscount(flatDiscount);
+
+        System.out.println("\nTest 4: Flat Discount");
+        System.out.println("Subtotal:    Rs. "
+                + flatOrder.getTotal().toPlainString());
+        System.out.println("Discount:    Rs. "
+                + flatOrder.getDiscountAmount().toPlainString());
+        System.out.println("Final total: Rs. "
+                + flatOrder.getFinalTotal().toPlainString());
+
+        printResult(
+                flatOrder.getDiscountAmount()
+                        .compareTo(new BigDecimal("100.00")) == 0
+                && flatOrder.getFinalTotal()
+                        .compareTo(new BigDecimal("1099.00")) == 0
+        );
+
+        // Test 5: Discount cannot reduce final total below zero
+        Order cappedOrder = createOrder(
+                3, "1199.00", 1
+        );
+
+        Discount oversizedFlatDiscount =
+                new FlatDiscount(new BigDecimal("1500.00"));
+
+        cappedOrder.applyDiscount(oversizedFlatDiscount);
+
+        System.out.println("\nTest 5: Flat Discount Cannot Exceed Subtotal");
+        System.out.println("Subtotal:    Rs. "
+                + cappedOrder.getTotal().toPlainString());
+        System.out.println("Discount:    Rs. "
+                + cappedOrder.getDiscountAmount().toPlainString());
+        System.out.println("Final total: Rs. "
+                + cappedOrder.getFinalTotal().toPlainString());
+
+        printResult(
+                cappedOrder.getDiscountAmount()
+                        .compareTo(new BigDecimal("1199.00")) == 0
+                && cappedOrder.getFinalTotal()
+                        .compareTo(new BigDecimal("0.00")) == 0
+        );
+
+        // Test 6: Buy 3 Get 1 Free with different prices
+        Customer customer = createCustomer();
+
+        Order buyThreeGetOneFreeOrder = new Order(4, customer);
+
+        Product product1 = new Product(
+                "T001", "Product A", "Testing",
+                new BigDecimal("100.00"), 10
+        );
+
+        Product product2 = new Product(
+                "T002", "Product B", "Testing",
+                new BigDecimal("80.00"), 10
+        );
+
+        Product product3 = new Product(
+                "T003", "Product C", "Testing",
+                new BigDecimal("60.00"), 10
+        );
+
+        Product product4 = new Product(
+                "T004", "Product D", "Testing",
+                new BigDecimal("40.00"), 10
+        );
+
+        buyThreeGetOneFreeOrder.addItem(new OrderItem(product1, 1));
+        buyThreeGetOneFreeOrder.addItem(new OrderItem(product2, 1));
+        buyThreeGetOneFreeOrder.addItem(new OrderItem(product3, 1));
+        buyThreeGetOneFreeOrder.addItem(new OrderItem(product4, 1));
+
+        Discount buyThreeGetOneFree =
+                new BuyThreeGetOneFreeDiscount();
+
+        buyThreeGetOneFreeOrder.applyDiscount(buyThreeGetOneFree);
+
+        System.out.println("\nTest 6: Buy 3 Get 1 Free");
+        System.out.println("Subtotal:    Rs. "
+                + buyThreeGetOneFreeOrder.getTotal().toPlainString());
+        System.out.println("Discount:    Rs. "
+                + buyThreeGetOneFreeOrder.getDiscountAmount().toPlainString());
+        System.out.println("Final total: Rs. "
+                + buyThreeGetOneFreeOrder.getFinalTotal().toPlainString());
+
+        printResult(
+                buyThreeGetOneFreeOrder.getTotal()
+                        .compareTo(new BigDecimal("280.00")) == 0
+                && buyThreeGetOneFreeOrder.getDiscountAmount()
+                        .compareTo(new BigDecimal("40.00")) == 0
+                && buyThreeGetOneFreeOrder.getFinalTotal()
+                        .compareTo(new BigDecimal("240.00")) == 0
+        );
+
+        // Test 7: Fewer than four items means no free item
+        Order threeItemsOrder = new Order(5, customer);
+
+        Product item = new Product(
+                "T005", "Sample Item", "Testing",
+                new BigDecimal("100.00"), 10
+        );
+
+        threeItemsOrder.addItem(new OrderItem(item, 3));
+        threeItemsOrder.applyDiscount(new BuyThreeGetOneFreeDiscount());
+
+        System.out.println("\nTest 7: Buy 3 Get 1 Free with Only 3 Items");
+        System.out.println("Subtotal:    Rs. "
+                + threeItemsOrder.getTotal().toPlainString());
+        System.out.println("Discount:    Rs. "
+                + threeItemsOrder.getDiscountAmount().toPlainString());
+        System.out.println("Final total: Rs. "
+                + threeItemsOrder.getFinalTotal().toPlainString());
+
+        printResult(
+                threeItemsOrder.getTotal()
+                        .compareTo(new BigDecimal("300.00")) == 0
+                && threeItemsOrder.getDiscountAmount()
+                        .compareTo(new BigDecimal("0.00")) == 0
+                && threeItemsOrder.getFinalTotal()
+                        .compareTo(new BigDecimal("300.00")) == 0
+        );
+    }
+
+    private static Order createOrder(
+            int orderId, String price, int quantity) {
+
+        Customer customer = createCustomer();
+
+        Product product = new Product(
+                "P" + orderId,
+                "Test Product",
+                "Testing",
+                new BigDecimal(price),
+                10
+        );
+
+        Order order = new Order(orderId, customer);
+        order.addItem(new OrderItem(product, quantity));
+
+        return order;
+    }
+
+    private static Customer createCustomer() {
+        return new Customer(
+                1,
+                "Mujeeb",
+                "mujeeb@example.com",
+                "03001234567"
+        );
+    }
+
+    private static void printResult(boolean passed) {
+        System.out.println("Passed:   " + passed);
+    }
+}
+
+========== Order.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public class Order {
+
+    private static final int MONEY_SCALE = 2;
+    private static final RoundingMode ROUNDING_RULE = RoundingMode.HALF_UP;
+
+    private final int id;
+    private final Customer customer;
+    private final LocalDate date;
+    private final List<OrderItem> items;
+    private OrderStatus status;
+
+    private Discount appliedDiscount;
+    private BigDecimal discountAmount;
+
+    public Order(int id, Customer customer) {
+        if (id <= 0) {
+            throw new IllegalArgumentException(
+                    "Order ID must be positive."
+            );
+        }
+
+        if (customer == null) {
+            throw new IllegalArgumentException(
+                    "An order must have a customer."
+            );
+        }
+
+        this.id = id;
+        this.customer = customer;
+        this.date = LocalDate.now();
+        this.items = new ArrayList<>();
+        this.status = OrderStatus.NEW;
+        this.appliedDiscount = null;
+        this.discountAmount = BigDecimal.ZERO.setScale(MONEY_SCALE);
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public Customer getCustomer() {
+        return customer;
+    }
+
+    public LocalDate getDate() {
+        return date;
+    }
+
+    public List<OrderItem> getItems() {
+        return Collections.unmodifiableList(items);
+    }
+
+    public OrderStatus getStatus() {
+        return status;
+    }
+
+    public Discount getAppliedDiscount() {
+        return appliedDiscount;
+    }
+
+    public BigDecimal getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public void changeStatus(OrderStatus newStatus) {
+        if (!status.canTransitionTo(newStatus)) {
+            throw new IllegalStateException(
+                    status.getTransitionFailureReason(newStatus)
+            );
+        }
+
+        if (status == OrderStatus.PAID
+                && newStatus == OrderStatus.CANCELLED) {
+            System.out.println(
+                    "Reminder: A refund is required for this cancellation."
+            );
+        }
+
+        status = newStatus;
+    }
+
+    public void addItem(OrderItem item) {
+        if (item == null) {
+            throw new IllegalArgumentException(
+                    "Order item cannot be null."
+            );
+        }
+
+        items.add(item);
+    }
+
+    public BigDecimal getTotal() {
+        BigDecimal total = BigDecimal.ZERO.setScale(MONEY_SCALE);
+
+        for (OrderItem item : items) {
+            total = total.add(item.getLineTotal());
+        }
+
+        return total.setScale(MONEY_SCALE, ROUNDING_RULE);
+    }
+
+    public void applyDiscount(Discount discount) {
+        if (discount == null) {
+            throw new IllegalArgumentException(
+                    "Discount cannot be null."
+            );
+        }
+
+        BigDecimal calculatedDiscount = discount.calculateDiscount(this)
+                .setScale(MONEY_SCALE, ROUNDING_RULE);
+
+        if (calculatedDiscount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException(
+                    "Discount cannot be negative."
+            );
+        }
+
+        this.appliedDiscount = discount;
+
+        this.discountAmount = calculatedDiscount.min(getTotal())
+                .setScale(MONEY_SCALE, ROUNDING_RULE);
+    }
+
+    public BigDecimal getFinalTotal() {
+        return getTotal()
+                .subtract(discountAmount)
+                .max(BigDecimal.ZERO.setScale(MONEY_SCALE))
+                .setScale(MONEY_SCALE, ROUNDING_RULE);
+    }
+
+    public void printReceipt() {
+        System.out.println("\n==============================================");
+        System.out.println("                  SHOPFLOW");
+        System.out.println("                 ORDER RECEIPT");
+        System.out.println("==============================================");
+
+        System.out.println("Order ID: " + id);
+        System.out.println("Date: " + date);
+        System.out.println("Customer ID: " + customer.getId());
+        System.out.println("Customer: " + customer.getName());
+        System.out.println("Email: " + customer.getEmail());
+        System.out.println("Phone: " + customer.getPhone());
+        System.out.println("Status: " + status);
+
+        System.out.println("----------------------------------------------");
+        System.out.printf("%-18s %5s %9s %10s%n",
+                "Product", "Qty", "Price", "Total");
+        System.out.println("----------------------------------------------");
+
+        for (OrderItem item : items) {
+            System.out.printf("%-18s %5d %9s %10s%n",
+                    item.getProduct().getName(),
+                    item.getQuantity(),
+                    item.getPriceAtPurchase().toPlainString(),
+                    item.getLineTotal().toPlainString());
+        }
+
+        System.out.println("----------------------------------------------");
+        System.out.println("SUBTOTAL:          Rs. " + getTotal().toPlainString());
+
+        if (appliedDiscount != null) {
+            System.out.println(
+                    "Discount:          " + appliedDiscount.getName()
+            );
+        } else {
+            System.out.println("Discount:          None");
+        }
+
+        System.out.println(
+                "Discount Amount:   Rs. " + discountAmount.toPlainString()
+        );
+
+        System.out.println(
+                "FINAL TOTAL:       Rs. " + getFinalTotal().toPlainString()
+        );
+
+        System.out.println("==============================================");
+    }
+}
+
+========== OrderItem.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+public class OrderItem {
+
+    private final Product product;
+    private final int quantity;
+    private final BigDecimal priceAtPurchase;
+    private final BigDecimal lineTotal;
+
+    public OrderItem(Product product, int quantity) {
+        if (product == null) {
+            throw new IllegalArgumentException(
+                    "Product cannot be null."
+            );
+        }
+
+        if (quantity <= 0) {
+            throw new IllegalArgumentException(
+                    "Quantity must be greater than zero."
+            );
+        }
+
+        this.product = product;
+        this.quantity = quantity;
+        this.priceAtPurchase = product.getPrice();
+
+        this.lineTotal = priceAtPurchase
+                .multiply(BigDecimal.valueOf(quantity))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public Product getProduct() {
+        return product;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public BigDecimal getPriceAtPurchase() {
+        return priceAtPurchase;
+    }
+
+    public BigDecimal getLineTotal() {
+        return lineTotal;
+    }
+}
+
+========== OrderStatus.java ==========
+
+package com.shopflow;
+
+import java.util.EnumSet;
+import java.util.Set;
+
+public enum OrderStatus {
+
+    NEW,
+    PAID,
+    SHIPPED,
+    DELIVERED,
+    CANCELLED;
+
+    public Set<OrderStatus> getAllowedNextStatuses() {
+        switch (this) {
+            case NEW:
+                return EnumSet.of(PAID, CANCELLED);
+
+            case PAID:
+                return EnumSet.of(SHIPPED, CANCELLED);
+
+            case SHIPPED:
+                return EnumSet.of(DELIVERED);
+
+            case DELIVERED:
+            case CANCELLED:
+                return EnumSet.noneOf(OrderStatus.class);
+
+            default:
+                throw new IllegalStateException(
+                        "Unknown order status: " + this
+                );
+        }
+    }
+
+    public boolean canTransitionTo(OrderStatus nextStatus) {
+        return nextStatus != null
+                && getAllowedNextStatuses().contains(nextStatus);
+    }
+
+    public String getTransitionFailureReason(OrderStatus nextStatus) {
+        if (nextStatus == null) {
+            return "New status cannot be null.";
+        }
+
+        if (this == nextStatus) {
+            return "Order is already " + this + ".";
+        }
+
+        if (this == DELIVERED) {
+            return "DELIVERED is a final status. "
+                    + "This order cannot be changed again.";
+        }
+
+        if (this == CANCELLED) {
+            return "CANCELLED is a final status. "
+                    + "This order cannot be changed again.";
+        }
+
+        return "Transition from " + this + " to " + nextStatus
+                + " is not allowed. Allowed next statuses: "
+                + getAllowedNextStatuses() + ".";
+    }
+}
+
+========== PercentageDiscount.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+public class PercentageDiscount implements Discount {
+
+    private final BigDecimal percentage;
+
+    public PercentageDiscount(BigDecimal percentage) {
+        if (percentage == null
+                || percentage.compareTo(BigDecimal.ZERO) <= 0
+                || percentage.compareTo(new BigDecimal("100")) > 0) {
+            throw new IllegalArgumentException(
+                    "Percentage must be greater than 0 and at most 100."
+            );
+        }
+
+        this.percentage = percentage;
+    }
+
+    @Override
+    public String getName() {
+        return percentage.stripTrailingZeros().toPlainString()
+                + "% Percentage Discount";
+    }
+
+    @Override
+    public BigDecimal calculateDiscount(Order order) {
+        if (order == null) {
+            throw new IllegalArgumentException(
+                    "Order cannot be null."
+            );
+        }
+
+        BigDecimal discount = order.getTotal()
+                .multiply(percentage)
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+        return discount.min(order.getTotal())
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+}
+
+========== Product.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Objects;
+
+public class Product {
+
+    private final String code;
+    private final String name;
+    private final String category;
+    private final BigDecimal price;
+    private int quantity;
+
+    public Product(String code, String name, String category,
+                   BigDecimal price, int quantity) {
+
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Product code cannot be empty.");
+        }
+
+        this.code = code.trim();
+        this.name = name;
+        this.category = category;
+        this.price = price.setScale(2, RoundingMode.HALF_UP);
+        this.quantity = quantity;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public boolean reduceStock(int quantityToReduce) {
+        if (quantityToReduce <= 0 || quantityToReduce > quantity) {
+            return false;
+        }
+
+        quantity -= quantityToReduce;
+        return true;
+    }
+
+    public BigDecimal getStockValue() {
+        return price.multiply(BigDecimal.valueOf(quantity))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public void displayProduct() {
+        System.out.printf(
+                "%-10s %-20s %-20s %10s %10d%n",
+                code, name, category, price.toPlainString(), quantity
+        );
+    }
+
+    /*
+     * BUSINESS RULE:
+     * Two products are the same if their product codes match,
+     * ignoring letter case. For example, KB-100 and kb-100
+     * represent the same product, regardless of price or stock.
+     */
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+
+        if (!(obj instanceof Product)) {
+            return false;
+        }
+
+        Product other = (Product) obj;
+
+        return code.equalsIgnoreCase(other.code);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(code.toUpperCase(java.util.Locale.ROOT));
+    }
+
+    @Override
+    public String toString() {
+        return "Product{" +
+                "code='" + code + '\'' +
+                ", name='" + name + '\'' +
+                ", category='" + category + '\'' +
+                ", price=" + price.toPlainString() +
+                ", quantity=" + quantity +
+                '}';
+    }
+}
+
+========== ProductEqualityTest.java ==========
+
+package com.shopflow;
+
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
+
+public class ProductEqualityTest {
+
+    public static void main(String[] args) {
+
+        Product first = new Product(
+                "KB-100",
+                "Wireless Keyboard",
+                "Accessories",
+                new BigDecimal("1500.00"),
+                10
+        );
+
+        Product second = new Product(
+                "kb-100",
+                "Wireless Keyboard",
+                "Accessories",
+                new BigDecimal("1700.00"),
+                5
+        );
+
+        System.out.println("Are products equal? " + first.equals(second));
+
+        Set<Product> productSet = new HashSet<>();
+        productSet.add(first);
+        productSet.add(second);
+
+        System.out.println("HashSet size: " + productSet.size());
+    }
+}

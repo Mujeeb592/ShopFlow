@@ -3,6 +3,7 @@ package com.shopflow;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Locale;
 import java.util.Objects;
 
 public class Product {
@@ -17,13 +18,56 @@ public class Product {
                    BigDecimal price, int quantity) {
 
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("Product code cannot be empty.");
+            throw new IllegalArgumentException(
+                    "Product code cannot be empty."
+            );
         }
 
-        this.code = code.trim();
-        this.name = name;
-        this.category = category;
-        this.price = price.setScale(2, RoundingMode.HALF_UP);
+        String cleanCode = code.trim();
+
+        if (!cleanCode.matches("[A-Za-z0-9-]+")) {
+            throw new IllegalArgumentException(
+                    "Product code can contain letters, digits, and hyphens only."
+            );
+        }
+
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Product name cannot be empty."
+            );
+        }
+
+        if (category == null || category.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Product category cannot be empty."
+            );
+        }
+
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(
+                    "Product price must be greater than zero."
+            );
+        }
+
+        if (quantity < 0) {
+            throw new IllegalArgumentException(
+                    "Product quantity cannot be negative."
+            );
+        }
+
+        BigDecimal roundedPrice =
+                price.setScale(2, RoundingMode.HALF_UP);
+
+        if (roundedPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(
+                    "Product price must be at least Rs. 0.01 after rounding."
+            );
+        }
+
+        this.code = cleanCode;
+        this.name = name.trim();
+        this.category = category.trim();
+        this.price = roundedPrice;
         this.quantity = quantity;
     }
 
@@ -70,9 +114,8 @@ public class Product {
 
     /*
      * BUSINESS RULE:
-     * Two products are the same if their product codes match,
-     * ignoring letter case. For example, KB-100 and kb-100
-     * represent the same product, regardless of price or stock.
+     * Two products are equal when their codes match,
+     * ignoring letter case.
      */
 
     @Override
@@ -86,13 +129,12 @@ public class Product {
         }
 
         Product other = (Product) obj;
-
         return code.equalsIgnoreCase(other.code);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(code.toUpperCase(java.util.Locale.ROOT));
+        return Objects.hash(code.toUpperCase(Locale.ROOT));
     }
 
     @Override
